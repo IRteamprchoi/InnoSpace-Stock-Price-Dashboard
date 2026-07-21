@@ -171,19 +171,43 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
 
   const weekChart = useMemo(() => {
     if (range !== "1W") return null;
+
+    // intraday_price 데이터를 날짜별로 그룹핑 (타임스탬프의 앞 10자리 = YYYY-MM-DD 라고 가정)
+    const intradayByDate = new Map<string, IntradayRow[]>();
+    intradayData.forEach((r) => {
+      const dateKey = (r.ts || "").slice(0, 10);
+      if (!dateKey) return;
+      if (!intradayByDate.has(dateKey)) intradayByDate.set(dateKey, []);
+      intradayByDate.get(dateKey)!.push(r);
+    });
+    intradayByDate.forEach((arr) => arr.sort((a, b) => a.ts.localeCompare(b.ts)));
+
     const points: { date: string; kind: string; v: number; dayColor: string; isStart: boolean; dayChg: number; dayChgPct: number }[] = [];
     chartData.forEach((p) => {
       const up = p.chg >= 0;
-      const seq = up
-        ? [{ v: p.open, k: "시가" }, { v: p.low, k: "저가" }, { v: p.high, k: "고가" }, { v: p.close, k: "종가" }]
-        : [{ v: p.open, k: "시가" }, { v: p.high, k: "고가" }, { v: p.low, k: "저가" }, { v: p.close, k: "종가" }];
-      seq.forEach((s, j) => {
-        points.push({ date: p.d, kind: s.k, v: s.v, dayColor: up ? "#f87171" : "#60a5fa", isStart: j === 0, dayChg: p.chg, dayChgPct: p.chgPct });
-      });
+      const dayColor = up ? "#f87171" : "#60a5fa";
+      const intraForDay = intradayByDate.get(p.d);
+
+      if (intraForDay && intraForDay.length > 1) {
+        // 실제 장중 데이터가 있는 날: 촘촘한 실데이터 사용 (네이버 스타일)
+        intraForDay.forEach((r, j) => {
+          const timeLabel = r.ts.length >= 16 ? r.ts.slice(11, 16) : r.ts;
+          points.push({ date: p.d + " " + timeLabel, kind: "체결", v: r.price, dayColor, isStart: j === 0, dayChg: p.chg, dayChgPct: p.chgPct });
+        });
+      } else {
+        // 장중 데이터가 아직 없는 날: 시가/저가/고가/종가로 근사
+        const seq = up
+          ? [{ v: p.open, k: "시가" }, { v: p.low, k: "저가" }, { v: p.high, k: "고가" }, { v: p.close, k: "종가" }]
+          : [{ v: p.open, k: "시가" }, { v: p.high, k: "고가" }, { v: p.low, k: "저가" }, { v: p.close, k: "종가" }];
+        seq.forEach((s, j) => {
+          points.push({ date: p.d, kind: s.k, v: s.v, dayColor, isStart: j === 0, dayChg: p.chg, dayChgPct: p.chgPct });
+        });
+      }
     });
+
     const rows: any[] = points.map((pt, i) => ({
       idx: i,
-      tick: pt.isStart ? pt.date.slice(5).replace("-", "/") : "",
+      tick: pt.isStart ? pt.date.slice(5, 10).replace("-", "/") : "",
       date: pt.date, kind: pt.kind, dayChg: pt.dayChg, dayChgPct: pt.dayChgPct,
     }));
     const segs: { key: string; color: string }[] = [];
@@ -194,7 +218,7 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
       segs.push({ key, color: points[i].dayColor });
     }
     return { rows, segs };
-  }, [chartData, range]);
+  }, [chartData, range, intradayData]);
 
   const maxPoint = useMemo(() => chartData.length ? chartData.reduce((a, b) => (b.close > a.close ? b : a), chartData[0]) : null, [chartData]);
   const minPoint = useMemo(() => chartData.length ? chartData.reduce((a, b) => (b.close < a.close ? b : a), chartData[0]) : null, [chartData]);
