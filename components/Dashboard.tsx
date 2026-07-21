@@ -1,0 +1,465 @@
+"use client";
+
+import React, { useState, useEffect, useMemo } from "react";
+import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceDot } from "recharts";
+import { Rocket, TrendingUp, TrendingDown, Circle, ChevronDown } from "lucide-react";
+import type { DailyRow, IntradayRow } from "@/lib/sheets";
+
+const fmt = (n: number) => n == null ? "-" : n.toLocaleString("ko-KR");
+const fmtSigned = (n: number) => n == null ? "-" : (n > 0 ? "+" : "") + n.toLocaleString("ko-KR");
+const fmtWon = (n: number) => n == null ? "-" : "₩" + n.toLocaleString("ko-KR");
+const fmtEok = (n: number) => n == null ? "-" : (n / 100000000).toLocaleString("ko-KR", { maximumFractionDigits: 0 }) + "억원";
+
+const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
+
+function koreanDateLabel(dateStr: string) {
+  const dt = new Date(dateStr + "T00:00:00+09:00");
+  const wd = WEEKDAY_KO[dt.getDay()];
+  const [y, m, d] = dateStr.split("-");
+  return `${y}년 ${parseInt(m)}월 ${parseInt(d)}일 (${wd})`;
+}
+
+function formatNowKST(date: Date) {
+  const kst = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+  const wd = WEEKDAY_KO[kst.getDay()];
+  const y = kst.getFullYear(), m = kst.getMonth() + 1, d = kst.getDate();
+  const h = kst.getHours();
+  const min = String(kst.getMinutes()).padStart(2, "0");
+  const ampm = h < 12 ? "오전" : "오후";
+  let h12 = h % 12; if (h12 === 0) h12 = 12;
+  return `${y}년 ${m}월 ${d}일 (${wd}) ${ampm} ${h12}:${min} 기준`;
+}
+
+function isMarketOpenNow() {
+  const now = new Date();
+  const kst = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+  const day = kst.getDay();
+  const mins = kst.getHours() * 60 + kst.getMinutes();
+  return day >= 1 && day <= 5 && mins >= 9 * 60 && mins <= 15 * 60 + 30;
+}
+
+function ChangeTag({ value, pct, size = "base" }: { value: number; pct?: number | null; size?: "base" | "lg" }) {
+  const up = value > 0;
+  const flat = value === 0;
+  const color = flat ? "text-slate-400" : up ? "text-red-400" : "text-blue-400";
+  const Icon = up ? TrendingUp : TrendingDown;
+  const textSize = size === "lg" ? "text-lg" : "text-sm";
+  return (
+    <span className={`inline-flex items-center gap-1 font-mono ${textSize} ${color}`}>
+      {!flat && <Icon size={size === "lg" ? 18 : 14} />}
+      {up ? "+" : ""}{fmt(value)}
+      {pct != null && <span className="opacity-80">({up ? "+" : ""}{pct.toFixed(2)}%)</span>}
+    </span>
+  );
+}
+
+function StatCard({ label, value, sub, highlight }: { label: string; value: React.ReactNode; sub?: React.ReactNode; highlight?: string }) {
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-lg px-4 py-3 flex flex-col gap-1 min-w-0">
+      <span className="text-[11px] uppercase tracking-wider text-slate-500 font-medium whitespace-nowrap">{label}</span>
+      <span className={`font-mono text-lg tabular-nums ${highlight || "text-slate-100"}`}>{value}</span>
+      {sub && <span className="text-xs text-slate-500">{sub}</span>}
+    </div>
+  );
+}
+
+function SectionHeader({ title, meta, right }: { title: string; meta?: React.ReactNode; right?: React.ReactNode }) {
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="w-1 h-4 bg-amber-400 rounded-sm shrink-0" />
+          <h2 className="text-sm font-semibold tracking-wide text-slate-100">{title}</h2>
+        </div>
+        {right}
+      </div>
+      {meta && <div className="text-[11px] text-slate-500 font-mono pl-3 mt-1 min-h-[30px] leading-snug">{meta}</div>}
+    </div>
+  );
+}
+
+function HeaderClock() {
+  const [elapsed, setElapsed] = useState(0);
+  const [open] = useState(isMarketOpenNow());
+  useEffect(() => {
+    const t = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const h = String(Math.floor(elapsed / 3600)).padStart(2, "0");
+  const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, "0");
+  const s = String(elapsed % 60).padStart(2, "0");
+  return (
+    <div className="flex items-center gap-2 font-mono text-xs text-slate-400">
+      <Circle size={8} className={open ? "fill-amber-400 text-amber-400 animate-pulse" : "fill-slate-600 text-slate-600"} />
+      <span>{open ? "장중" : "장마감"}</span>
+      <span className="text-slate-600">|</span>
+      <span>T+{h}:{m}:{s}</span>
+    </div>
+  );
+}
+
+const RANGES = [
+  { key: "1W", label: "1주일", days: 6 },
+  { key: "3M", label: "3개월", days: 66 },
+  { key: "1Y", label: "1년", days: 252 },
+  { key: "ALL", label: "전체", days: 9999 },
+] as const;
+
+type RangeKey = typeof RANGES[number]["key"];
+
+const COLUMNS = [
+  { key: "d", label: "일자", sticky: true },
+  { key: "close", label: "종가" },
+  { key: "chg", label: "등락폭", signed: true },
+  { key: "chgPct", label: "등락률", pct: true },
+  { key: "open", label: "시가" },
+  { key: "high", label: "고가" },
+  { key: "low", label: "저가" },
+  { key: "vol", label: "거래량" },
+  { key: "indiv", label: "개인", flow: true },
+  { key: "foreign", label: "외국인", flow: true },
+  { key: "inst", label: "기관계", flow: true, group: true },
+  { key: "fin", label: "금융투자", flow: true, sub: true },
+  { key: "ins", label: "보험", flow: true, sub: true },
+  { key: "tr", label: "투신", flow: true, sub: true },
+  { key: "bank", label: "은행", flow: true, sub: true },
+  { key: "etcFin", label: "기타금융", flow: true, sub: true },
+  { key: "pen", label: "연기금등", flow: true, sub: true },
+  { key: "pe", label: "사모펀드", flow: true, sub: true },
+  { key: "etcCorp", label: "기타법인", flow: true, group: true },
+  { key: "etcForeign", label: "기타외국인", flow: true, group: true },
+  { key: "etcTotal", label: "기타합계", flow: true, group: true },
+] as const;
+
+function flowColor(v: number) {
+  if (v > 0) return "text-red-400/90";
+  if (v < 0) return "text-blue-400/90";
+  return "text-slate-500";
+}
+
+export default function Dashboard({ dailyData, intradayData }: { dailyData: DailyRow[]; intradayData: IntradayRow[] }) {
+  const [range, setRange] = useState<RangeKey>("1W");
+  const [query, setQuery] = useState("");
+  const [tableOpen, setTableOpen] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const sorted = useMemo(() => [...dailyData].sort((a, b) => a.d.localeCompare(b.d)), [dailyData]);
+  const latest = sorted[sorted.length - 1];
+  const prevClose = sorted.length > 1 ? sorted[sorted.length - 2].close : latest?.close;
+  const marketOpen = isMarketOpenNow();
+
+  // 장중 참고 시세: intraday_price 시트의 가장 최근 값, 없으면 일별 확정 데이터로 대체
+  const latestIntraday = intradayData.length ? intradayData[intradayData.length - 1] : null;
+  const live = latestIntraday
+    ? {
+        close: latestIntraday.price, chg: latestIntraday.chg, chgPct: latestIntraday.chgPct,
+        open: latestIntraday.open, high: latestIntraday.high, low: latestIntraday.low,
+        vol: latestIntraday.vol, amt: latestIntraday.amt, mcap: latestIntraday.mcap,
+      }
+    : latest
+    ? { close: latest.close, chg: latest.chg, chgPct: latest.chgPct, open: latest.open, high: latest.high, low: latest.low, vol: latest.vol, amt: latest.amt, mcap: latest.mcap }
+    : null;
+
+  const rangeDays = RANGES.find((r) => r.key === range)!.days;
+  const chartData = useMemo(() => sorted.slice(-rangeDays), [sorted, rangeDays]);
+
+  const weekChart = useMemo(() => {
+    if (range !== "1W") return null;
+    const points: { date: string; kind: string; v: number; dayColor: string; isStart: boolean; dayChg: number; dayChgPct: number }[] = [];
+    chartData.forEach((p) => {
+      const up = p.chg >= 0;
+      const seq = up
+        ? [{ v: p.open, k: "시가" }, { v: p.low, k: "저가" }, { v: p.high, k: "고가" }, { v: p.close, k: "종가" }]
+        : [{ v: p.open, k: "시가" }, { v: p.high, k: "고가" }, { v: p.low, k: "저가" }, { v: p.close, k: "종가" }];
+      seq.forEach((s, j) => {
+        points.push({ date: p.d, kind: s.k, v: s.v, dayColor: up ? "#f87171" : "#60a5fa", isStart: j === 0, dayChg: p.chg, dayChgPct: p.chgPct });
+      });
+    });
+    const rows: any[] = points.map((pt, i) => ({
+      idx: i,
+      tick: pt.isStart ? pt.date.slice(5).replace("-", "/") : "",
+      date: pt.date, kind: pt.kind, dayChg: pt.dayChg, dayChgPct: pt.dayChgPct,
+    }));
+    const segs: { key: string; color: string }[] = [];
+    for (let i = 1; i < points.length; i++) {
+      const key = `seg${i}`;
+      rows[i - 1][key] = points[i - 1].v;
+      rows[i][key] = points[i].v;
+      segs.push({ key, color: points[i].dayColor });
+    }
+    return { rows, segs };
+  }, [chartData, range]);
+
+  const maxPoint = useMemo(() => chartData.length ? chartData.reduce((a, b) => (b.close > a.close ? b : a), chartData[0]) : null, [chartData]);
+  const minPoint = useMemo(() => chartData.length ? chartData.reduce((a, b) => (b.close < a.close ? b : a), chartData[0]) : null, [chartData]);
+
+  function AreaTooltip({ active, payload }: any) {
+    if (!active || !payload || !payload.length) return null;
+    const row = payload[0].payload;
+    return (
+      <div className="bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-xs shadow-xl">
+        <div className="text-slate-400 mb-1 font-mono">{row.d}</div>
+        <div className="text-slate-100 font-mono">종가 {fmtWon(row.close)}</div>
+        <div className={row.chg >= 0 ? "text-red-400 font-mono" : "text-blue-400 font-mono"}>
+          {row.chg >= 0 ? "+" : ""}{fmt(row.chg)} ({row.chgPct >= 0 ? "+" : ""}{row.chgPct}%)
+        </div>
+      </div>
+    );
+  }
+
+  function WeekTooltip({ active, payload }: any) {
+    if (!active || !payload || !payload.length) return null;
+    const row = payload[0].payload;
+    return (
+      <div className="bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-xs shadow-xl">
+        <div className="text-slate-400 mb-1 font-mono">{row.date} · {row.kind}</div>
+        <div className="text-slate-100 font-mono">{fmtWon(payload[0].value)}</div>
+        <div className={row.dayChg >= 0 ? "text-red-400 font-mono" : "text-blue-400 font-mono"}>
+          당일 {row.dayChg >= 0 ? "+" : ""}{fmt(row.dayChg)} ({row.dayChgPct >= 0 ? "+" : ""}{row.dayChgPct}%)
+        </div>
+      </div>
+    );
+  }
+
+  const filteredTable = useMemo(() => {
+    const rows = [...sorted].reverse();
+    if (!query) return rows;
+    return rows.filter((r) => r.d.includes(query));
+  }, [sorted, query]);
+
+  const visibleRows = tableOpen ? filteredTable : filteredTable.slice(0, 12);
+  const visibleColumns = showDetail ? COLUMNS : COLUMNS.filter((c: any) => !c.sub);
+
+  if (!latest || !live) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <p className="text-slate-400 text-sm">
+          데이터를 아직 불러오지 못했습니다. 구글시트 게시 링크(DAILY_CSV_URL / INTRADAY_CSV_URL) 환경변수 설정을 확인해주세요.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
+
+        <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-400/10 border border-amber-400/30 flex items-center justify-center">
+              <Rocket size={20} className="text-amber-400" />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-50">이노스페이스 주가 및 매매 동향</h1>
+              <p className="text-xs text-slate-500 font-mono">462350 · KOSDAQ</p>
+            </div>
+          </div>
+          <HeaderClock />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10 items-stretch">
+
+          <section className="h-full flex flex-col">
+            <SectionHeader
+              title="현재 시세"
+              right={<span className="text-[10px] text-slate-600 border border-slate-800 rounded px-1.5 py-0.5">KIS API 연동 · 5분 간격</span>}
+              meta={
+                <>
+                  <div className="inline-flex items-center gap-2">
+                    <Circle size={8} className={marketOpen ? "fill-amber-400 text-amber-400 animate-pulse" : "fill-slate-600 text-slate-600"} />
+                    <span>{marketOpen ? "장중" : "장마감"}</span>
+                    <span className="text-slate-600">·</span>
+                    <span>{formatNowKST(now)}</span>
+                  </div>
+                  <div>매 5분마다 업데이트</div>
+                </>
+              }
+            />
+            <div className="bg-gradient-to-br from-slate-900 to-slate-900/40 border border-slate-800 rounded-xl p-5 flex-1 flex flex-col justify-between gap-4">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <div className="text-4xl font-mono font-semibold tabular-nums text-slate-50">{fmtWon(live.close)}</div>
+                  <div className="mt-1"><ChangeTag value={live.chg} pct={live.chgPct} size="lg" /></div>
+                </div>
+                <div className="text-xs text-slate-500 text-right">
+                  <div>전일종가 <span className="font-mono text-slate-300">{fmtWon(prevClose)}</span></div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard label="시가" value={fmtWon(live.open)} />
+                <StatCard label="거래량" value={fmt(live.vol) + "주"} />
+                <StatCard label="고가" value={fmtWon(live.high)} highlight="text-red-300" />
+                <StatCard label="거래대금" value={fmtEok(live.amt)} />
+                <StatCard label="저가" value={fmtWon(live.low)} highlight="text-blue-300" />
+                <StatCard label="시가총액" value={fmtEok(live.mcap)} />
+              </div>
+            </div>
+          </section>
+
+          <section className="h-full flex flex-col">
+            <SectionHeader
+              title="일별 주가 및 거래 현황"
+              meta={
+                <>
+                  <div>{koreanDateLabel(latest.d)} · 한국거래소(KRX) 마감 기준</div>
+                  <div>매일 18시 30분 업데이트</div>
+                </>
+              }
+            />
+            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5 flex-1 flex flex-col justify-between gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard label="종가" value={fmtWon(latest.close)} sub={<ChangeTag value={latest.chg} pct={latest.chgPct} />} />
+                <StatCard label="총 거래량" value={fmt(latest.vol) + "주"} />
+                <StatCard label="시가총액" value={fmtEok(latest.mcap)} />
+                <StatCard label="거래대금" value={fmtEok(latest.amt)} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard label="외국인 순매수" value={fmtSigned(latest.foreign)} highlight={flowColor(latest.foreign)} />
+                <StatCard label="개인 순매수" value={fmtSigned(latest.indiv)} highlight={flowColor(latest.indiv)} />
+                <StatCard label="기관 순매수" value={fmtSigned(latest.inst)} highlight={flowColor(latest.inst)} />
+                <StatCard label="기타 순매수" value={fmtSigned(latest.etcTotal)} highlight={flowColor(latest.etcTotal)} />
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h2 className="text-sm font-semibold text-slate-300">주가 추이</h2>
+          <div className="flex gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1">
+            {RANGES.map((r) => (
+              <button
+                key={r.key}
+                onClick={() => setRange(r.key)}
+                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+                  range === r.key ? "bg-amber-400/20 text-amber-300" : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4 mb-10">
+          <ResponsiveContainer width="100%" height={240}>
+            {range === "1W" && weekChart ? (
+              <ComposedChart data={weekChart.rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                <XAxis dataKey="tick" tick={{ fontSize: 10, fill: "#64748b" }} interval={0} axisLine={{ stroke: "#1e293b" }} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#64748b" }} domain={["auto", "auto"]} tickFormatter={(v) => fmt(v)} axisLine={false} tickLine={false} width={56} />
+                <Tooltip content={<WeekTooltip />} />
+                {weekChart.segs.map((s) => (
+                  <Line key={s.key} dataKey={s.key} stroke={s.color} strokeWidth={2.5} dot={false} connectNulls={false} isAnimationActive={false} />
+                ))}
+              </ComposedChart>
+            ) : (
+              <ComposedChart data={chartData} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="priceFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#4ade80" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#4ade80" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                <XAxis dataKey="d" tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={(v) => v.slice(5).replace("-", "/")} minTickGap={30} axisLine={{ stroke: "#1e293b" }} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#64748b" }} domain={["auto", "auto"]} tickFormatter={(v) => fmt(v)} axisLine={false} tickLine={false} width={56} />
+                <Tooltip content={<AreaTooltip />} />
+                <Area type="monotone" dataKey="close" stroke="#4ade80" strokeWidth={2} fill="url(#priceFill)" dot={false} isAnimationActive={false} />
+                {maxPoint && (
+                  <ReferenceDot
+                    x={maxPoint.d} y={maxPoint.close} r={4} fill="#f87171" stroke="none"
+                    label={{ value: `최고 ${fmt(maxPoint.close)} (${maxPoint.d.slice(5).replace("-", "/")})`, position: "top", fill: "#f87171", fontSize: 10 }}
+                  />
+                )}
+                {minPoint && (
+                  <ReferenceDot
+                    x={minPoint.d} y={minPoint.close} r={4} fill="#60a5fa" stroke="none"
+                    label={{ value: `최저 ${fmt(minPoint.close)} (${minPoint.d.slice(5).replace("-", "/")})`, position: "bottom", fill: "#60a5fa", fontSize: 10 }}
+                  />
+                )}
+              </ComposedChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h2 className="text-sm font-semibold text-slate-300">일별 주가 · 투자자별 순매수 상세</h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowDetail((v) => !v)}
+              className={`px-3 py-1.5 text-xs rounded-md border font-medium transition-colors ${
+                showDetail ? "bg-amber-400/20 border-amber-400/40 text-amber-300" : "border-slate-800 text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              {showDetail ? "기관 상세항목 숨기기" : "기관 상세항목 펼치기"}
+            </button>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="날짜 검색 (예: 2026-05)"
+              className="bg-slate-900 border border-slate-800 rounded-md px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 outline-none focus:border-amber-400/50 w-40"
+            />
+          </div>
+        </div>
+        <div className="bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden mb-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px] border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-500">
+                  {visibleColumns.map((c: any) => (
+                    <th
+                      key={c.key}
+                      className={`text-right font-medium px-2.5 py-2 whitespace-nowrap ${c.sticky ? "text-left sticky left-0 bg-slate-900 z-10" : ""} ${c.sub ? "text-slate-600" : ""}`}
+                    >
+                      {c.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map((r) => (
+                  <tr key={r.d} className="border-b border-slate-800/60 hover:bg-slate-800/30 font-mono">
+                    {visibleColumns.map((c: any) => {
+                      const v = (r as any)[c.key];
+                      let content: React.ReactNode = fmt(v);
+                      let cls = "text-slate-300";
+                      if (c.key === "d") cls = "text-slate-400";
+                      if (c.key === "close") cls = "text-slate-100";
+                      if ((c as any).signed) { content = fmtSigned(v); cls = v >= 0 ? "text-red-400" : "text-blue-400"; }
+                      if ((c as any).pct) { content = (v >= 0 ? "+" : "") + v + "%"; cls = v >= 0 ? "text-red-400" : "text-blue-400"; }
+                      if ((c as any).flow) { content = fmtSigned(v); cls = flowColor(v); }
+                      return (
+                        <td
+                          key={c.key}
+                          className={`px-2.5 py-1.5 text-right whitespace-nowrap ${c.sticky ? "text-left sticky left-0 bg-slate-950" : ""} ${cls} ${(c as any).sub ? "opacity-70" : ""}`}
+                        >
+                          {content}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {filteredTable.length > 12 && (
+            <button
+              onClick={() => setTableOpen((v) => !v)}
+              className="w-full py-2.5 text-xs text-slate-500 hover:text-amber-300 flex items-center justify-center gap-1 border-t border-slate-800"
+            >
+              {tableOpen ? "접기" : `전체 ${filteredTable.length}건 보기`}
+              <ChevronDown size={12} className={tableOpen ? "rotate-180 transition-transform" : "transition-transform"} />
+            </button>
+          )}
+        </div>
+
+        <p className="text-[10px] text-slate-700 text-center pt-4">이노스페이스 IR팀 내부용 대시보드</p>
+      </div>
+    </div>
+  );
+}
