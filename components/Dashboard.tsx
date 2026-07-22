@@ -205,6 +205,25 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
       }
     });
 
+    // daily_data에 아직 오늘자 행이 없어도(18:30 이전), intraday_price에 오늘 데이터가 있으면 그래프에 이어붙임
+    const lastDailyDate = chartData.length ? chartData[chartData.length - 1].d : null;
+    const extraDates = Array.from(intradayByDate.keys())
+      .filter((d) => !lastDailyDate || d > lastDailyDate)
+      .sort();
+    extraDates.forEach((dateKey) => {
+      const intraForDay = intradayByDate.get(dateKey);
+      if (!intraForDay || !intraForDay.length) return;
+      const refPrevClose = chartData.length ? chartData[chartData.length - 1].close : intraForDay[0].price;
+      const latestPrice = intraForDay[intraForDay.length - 1].price;
+      const dayChg = latestPrice - refPrevClose;
+      const dayChgPct = refPrevClose ? (dayChg / refPrevClose) * 100 : 0;
+      const dayColor = dayChg >= 0 ? "#f87171" : "#60a5fa";
+      intraForDay.forEach((r, j) => {
+        const timeLabel = r.ts.length >= 16 ? r.ts.slice(11, 16) : r.ts;
+        points.push({ date: dateKey + " " + timeLabel, kind: "체결", v: r.price, dayColor, isStart: j === 0, dayChg, dayChgPct });
+      });
+    });
+
     const rows: any[] = points.map((pt, i) => ({
       idx: i,
       tick: pt.isStart ? pt.date.slice(5, 10).replace("-", "/") : "",
