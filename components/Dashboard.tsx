@@ -171,8 +171,12 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
 
   const weekChart = useMemo(() => {
     if (range !== "1W") return null;
+    const WEEK_TRADING_DAYS = 5; // 네이버 등 기준, 5거래일
+    const MARKET_OPEN_MIN = 9 * 60; // 09:00
+    const MARKET_CLOSE_MIN = 15 * 60 + 30; // 15:30
+    const SESSION_LEN = MARKET_CLOSE_MIN - MARKET_OPEN_MIN;
 
-    // intraday_price 데이터를 날짜별로 그룹핑 (타임스탬프의 앞 10자리 = YYYY-MM-DD 라고 가정)
+    // intraday_price 데이터를 날짜별로 그룹핑
     const intradayByDate = new Map<string, IntradayRow[]>();
     intradayData.forEach((r) => {
       const dateKey = (r.ts || "").slice(0, 10);
@@ -182,51 +186,74 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
     });
     intradayByDate.forEach((arr) => arr.sort((a, b) => a.ts.localeCompare(b.ts)));
 
-    const points: { date: string; kind: string; v: number; dayColor: string; isStart: boolean; dayChg: number; dayChgPct: number }[] = [];
-    chartData.forEach((p) => {
+    // daily_data에 아직 없는(18:30 이전) "오늘" 같은 날짜가 intraday_price에 있으면 별도로 분리
+    const lastSortedDate = sorted.length ? sorted[sorted.length - 1].d : null;
+    const liveDates = Array.from(intradayByDate.keys())
+      .filter((d) => !lastSortedDate || d > lastSortedDate)
+      .sort();
+
+    // 전체 5거래일 중, 라이브(오늘)로 채워질 날짜 수를 뺀 만큼만 과거 확정 데이터에서 가져옴
+    const histCount = Math.max(WEEK_TRADING_DAYS - liveDates.length, 0);
+    const histDays = sorted.slice(-histCount);
+
+    // 하루 = x축에서 정확히 1칸을 차지하도록, "포인트 개수"가 아니라 "그날 몇 시였는지"로 x값을 계산
+    const dayLabels: string[] = [];
+    const points: { x: number; date: string; kind: string; v: number; dayColor: string; isStart: boolean; dayChg: number; dayChgPct: number }[] = [];
+
+    const timeToFraction = (hhmm: string) => {
+      const [h, m] = hhmm.split(":").map(Number);
+      const mins = h * 60 + (m || 0);
+      const clamped = Math.min(Math.max(mins, MARKET_OPEN_MIN), MARKET_CLOSE_MIN);
+      return (clamped - MARKET_OPEN_MIN) / SESSION_LEN;
+    };
+
+    histDays.forEach((p, dayIdx) => {
+      dayLabels.push(p.d);
       const up = p.chg >= 0;
       const dayColor = up ? "#f87171" : "#60a5fa";
       const intraForDay = intradayByDate.get(p.d);
 
       if (intraForDay && intraForDay.length > 1) {
-        // 실제 장중 데이터가 있는 날: 촘촘한 실데이터 사용 (네이버 스타일)
+        // 실제 장중 데이터가 있는 날: 촘촘한 실데이터, 실제 시각 기준으로 배치
         intraForDay.forEach((r, j) => {
-          const timeLabel = r.ts.length >= 16 ? r.ts.slice(11, 16) : r.ts;
-          points.push({ date: p.d + " " + timeLabel, kind: "체결", v: r.price, dayColor, isStart: j === 0, dayChg: p.chg, dayChgPct: p.chgPct });
+          const timeLabel = r.ts.length >= 16 ? r.ts.slice(11, 16) : "09:00";
+          const x = dayIdx + timeToFraction(timeLabel);
+          points.push({ x, date: p.d + " " + timeLabel, kind: "체결", v: r.price, dayColor, isStart: j === 0, dayChg: p.chg, dayChgPct: p.chgPct });
         });
       } else {
-        // 장중 데이터가 아직 없는 날: 시가/저가/고가/종가로 근사
+        // 장중 데이터가 아직 없는 날: 시가(09:00)/저가/고가(장중 임의 시점)/종가(15:30)로 근사, 하루 폭은 동일하게 유지
         const seq = up
-          ? [{ v: p.open, k: "시가" }, { v: p.low, k: "저가" }, { v: p.high, k: "고가" }, { v: p.close, k: "종가" }]
-          : [{ v: p.open, k: "시가" }, { v: p.high, k: "고가" }, { v: p.low, k: "저가" }, { v: p.close, k: "종가" }];
+          ? [{ v: p.open, k: "시가", frac: 0 }, { v: p.low, k: "저가", frac: 1 / 3 }, { v: p.high, k: "고가", frac: 2 / 3 }, { v: p.close, k: "종가", frac: 1 }]
+          : [{ v: p.open, k: "시가", frac: 0 }, { v: p.high, k: "고가", frac: 1 / 3 }, { v: p.low, k: "저가", frac: 2 / 3 }, { v: p.close, k: "종가", frac: 1 }];
         seq.forEach((s, j) => {
-          points.push({ date: p.d, kind: s.k, v: s.v, dayColor, isStart: j === 0, dayChg: p.chg, dayChgPct: p.chgPct });
+          points.push({ x: dayIdx + s.frac, date: p.d, kind: s.k, v: s.v, dayColor, isStart: j === 0, dayChg: p.chg, dayChgPct: p.chgPct });
         });
       }
     });
 
     // daily_data에 아직 오늘자 행이 없어도(18:30 이전), intraday_price에 오늘 데이터가 있으면 그래프에 이어붙임
-    const lastDailyDate = chartData.length ? chartData[chartData.length - 1].d : null;
-    const extraDates = Array.from(intradayByDate.keys())
-      .filter((d) => !lastDailyDate || d > lastDailyDate)
-      .sort();
-    extraDates.forEach((dateKey) => {
+    liveDates.forEach((dateKey, i) => {
+      const dayIdx = histDays.length + i;
+      dayLabels.push(dateKey);
       const intraForDay = intradayByDate.get(dateKey);
       if (!intraForDay || !intraForDay.length) return;
-      const refPrevClose = chartData.length ? chartData[chartData.length - 1].close : intraForDay[0].price;
+      const refPrevClose = sorted.length ? sorted[sorted.length - 1].close : intraForDay[0].price;
       const latestPrice = intraForDay[intraForDay.length - 1].price;
       const dayChg = latestPrice - refPrevClose;
       const dayChgPct = refPrevClose ? Math.round((dayChg / refPrevClose) * 10000) / 100 : 0;
       const dayColor = dayChg >= 0 ? "#f87171" : "#60a5fa";
       intraForDay.forEach((r, j) => {
-        const timeLabel = r.ts.length >= 16 ? r.ts.slice(11, 16) : r.ts;
-        points.push({ date: dateKey + " " + timeLabel, kind: "체결", v: r.price, dayColor, isStart: j === 0, dayChg, dayChgPct });
+        const timeLabel = r.ts.length >= 16 ? r.ts.slice(11, 16) : "09:00";
+        const x = dayIdx + timeToFraction(timeLabel);
+        points.push({ x, date: dateKey + " " + timeLabel, kind: "체결", v: r.price, dayColor, isStart: j === 0, dayChg, dayChgPct });
       });
     });
 
-    const rows: any[] = points.map((pt, i) => ({
-      idx: i,
-      tick: pt.isStart ? pt.date.slice(5, 10).replace("-", "/") : "",
+    // x값 기준으로 정렬 (같은 날 안에서, 그리고 날짜 간에도 시간 순서 보장)
+    points.sort((a, b) => a.x - b.x);
+
+    const rows: any[] = points.map((pt) => ({
+      x: pt.x,
       date: pt.date, kind: pt.kind, dayChg: pt.dayChg, dayChgPct: pt.dayChgPct,
     }));
     const segs: { key: string; color: string }[] = [];
@@ -236,8 +263,15 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
       rows[i][key] = points[i].v;
       segs.push({ key, color: points[i].dayColor });
     }
-    return { rows, segs };
-  }, [chartData, range, intradayData]);
+
+    const tickPositions = dayLabels.map((_, i) => i);
+    const tickFormatter = (v: number) => {
+      const label = dayLabels[Math.round(v)];
+      return label ? label.slice(5).replace("-", "/") : "";
+    };
+
+    return { rows, segs, tickPositions, tickFormatter, dayCount: dayLabels.length };
+  }, [sorted, range, intradayData]);
 
   const maxPoint = useMemo(() => chartData.length ? chartData.reduce((a, b) => (b.close > a.close ? b : a), chartData[0]) : null, [chartData]);
   const minPoint = useMemo(() => chartData.length ? chartData.reduce((a, b) => (b.close < a.close ? b : a), chartData[0]) : null, [chartData]);
@@ -393,7 +427,16 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
             {range === "1W" && weekChart ? (
               <ComposedChart data={weekChart.rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="tick" tick={{ fontSize: 10, fill: "#64748b" }} interval={0} axisLine={{ stroke: "#1e293b" }} tickLine={false} />
+                <XAxis
+                  dataKey="x"
+                  type="number"
+                  domain={[0, weekChart.dayCount]}
+                  ticks={weekChart.tickPositions}
+                  tickFormatter={weekChart.tickFormatter}
+                  tick={{ fontSize: 10, fill: "#64748b" }}
+                  axisLine={{ stroke: "#1e293b" }}
+                  tickLine={false}
+                />
                 <YAxis tick={{ fontSize: 10, fill: "#64748b" }} domain={["auto", "auto"]} tickFormatter={(v) => fmt(v)} axisLine={false} tickLine={false} width={56} />
                 <Tooltip content={<WeekTooltip />} />
                 {weekChart.segs.map((s) => (
