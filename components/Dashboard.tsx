@@ -216,7 +216,7 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
       const refPrevClose = chartData.length ? chartData[chartData.length - 1].close : intraForDay[0].price;
       const latestPrice = intraForDay[intraForDay.length - 1].price;
       const dayChg = latestPrice - refPrevClose;
-      const dayChgPct = refPrevClose ? (dayChg / refPrevClose) * 100 : 0;
+      const dayChgPct = refPrevClose ? Math.round((dayChg / refPrevClose) * 10000) / 100 : 0;
       const dayColor = dayChg >= 0 ? "#f87171" : "#60a5fa";
       intraForDay.forEach((r, j) => {
         const timeLabel = r.ts.length >= 16 ? r.ts.slice(11, 16) : r.ts;
@@ -250,7 +250,7 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
         <div className="text-slate-400 mb-1 font-mono">{row.d}</div>
         <div className="text-slate-100 font-mono">종가 {fmtWon(row.close)}</div>
         <div className={row.chg >= 0 ? "text-red-400 font-mono" : "text-blue-400 font-mono"}>
-          {row.chg >= 0 ? "+" : ""}{fmt(row.chg)} ({row.chgPct >= 0 ? "+" : ""}{row.chgPct}%)
+          {row.chg >= 0 ? "+" : ""}{fmt(row.chg)} ({row.chgPct >= 0 ? "+" : ""}{row.chgPct.toFixed(2)}%)
         </div>
       </div>
     );
@@ -264,7 +264,7 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
         <div className="text-slate-400 mb-1 font-mono">{row.date} · {row.kind}</div>
         <div className="text-slate-100 font-mono">{fmtWon(payload[0].value)}</div>
         <div className={row.dayChg >= 0 ? "text-red-400 font-mono" : "text-blue-400 font-mono"}>
-          당일 {row.dayChg >= 0 ? "+" : ""}{fmt(row.dayChg)} ({row.dayChgPct >= 0 ? "+" : ""}{row.dayChgPct}%)
+          당일 {row.dayChg >= 0 ? "+" : ""}{fmt(row.dayChg)} ({row.dayChgPct >= 0 ? "+" : ""}{row.dayChgPct.toFixed(2)}%)
         </div>
       </div>
     );
