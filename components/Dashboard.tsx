@@ -167,7 +167,29 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
     : null;
 
   const rangeDays = RANGES.find((r) => r.key === range)!.days;
-  const chartData = useMemo(() => sorted.slice(-rangeDays), [sorted, rangeDays]);
+  const chartData = useMemo(() => {
+    const base = sorted.slice(-rangeDays);
+    // daily_data에 아직 오늘자 확정 행이 없어도(18:30 이전), 장중 시세가 있으면
+    // 그래프 맨 끝에 "지금 이 순간"을 임시로 이어붙여서 마지막 지점이 멈춰있지 않게 함
+    const lastDate = base.length ? base[base.length - 1].d : null;
+    const todayKey = latestIntraday ? (latestIntraday.ts || "").slice(0, 10) : null;
+    if (todayKey && (!lastDate || todayKey > lastDate) && live) {
+      const prevCloseForToday = base.length ? base[base.length - 1].close : live.close;
+      const chg = live.close - prevCloseForToday;
+      const chgPct = prevCloseForToday ? Math.round((chg / prevCloseForToday) * 10000) / 100 : 0;
+      return [
+        ...base,
+        {
+          d: todayKey, close: live.close, chg, chgPct,
+          open: live.open, high: live.high, low: live.low,
+          vol: live.vol, amt: live.amt, mcap: live.mcap,
+          indiv: 0, foreign: 0, inst: 0, fin: 0, ins: 0, tr: 0, bank: 0,
+          etcFin: 0, pen: 0, pe: 0, etcCorp: 0, etcForeign: 0, etcTotal: 0,
+        } as DailyRow,
+      ];
+    }
+    return base;
+  }, [sorted, rangeDays, latestIntraday, live]);
 
   const weekChart = useMemo(() => {
     if (range !== "1W") return null;
