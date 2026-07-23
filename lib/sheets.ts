@@ -99,7 +99,7 @@ export async function getDailyData(): Promise<DailyRow[]> {
     return [];
   }
 
-  const res = await fetch(url, { next: { revalidate: 300 } });
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
     console.error("일별 데이터 조회 실패:", res.status);
     return [];
@@ -142,7 +142,7 @@ export async function getIntradayData(): Promise<IntradayRow[]> {
     return [];
   }
 
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
     console.error("장중 시세 조회 실패:", res.status);
     return [];
