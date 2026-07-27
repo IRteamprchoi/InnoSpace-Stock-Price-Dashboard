@@ -1,3 +1,5 @@
+@import "pretendard/dist/web/variable/pretendardvariable.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,47 +10,128 @@ html {
 
 body {
   background-color: #020617;
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 /*
-  공통 타이포그래피 클래스 (가독성 개선)
-  참고: 원본 스펙은 밝은 배경(#0F172A 텍스트) 기준이었으나, 이 대시보드는 어두운 배경이라
-  같은 "선명함/두께" 의도를 유지하면서 색상만 어두운 테마에 맞게 반전했습니다.
+  타이포그래피 시스템 (금융/IR 대시보드 스타일)
+  ------------------------------------------------------------
+  참고: 원본 스펙의 색상(#0F172A 텍스트 등)은 밝은 배경 기준이라, 이 대시보드의
+  어두운 배경에 맞게 명도만 반전했습니다. 크기·굵기·자간·숫자정렬 위계는 스펙 그대로 적용했습니다.
+
+  다크테마 색상 매핑:
+    #0F172A(일반 숫자, 밝은 배경 기준 진한 텍스트) → #E2E8F0 (slate-200)
+    #0F172A(핵심 숫자)                           → #F8FAFC (slate-50, 가장 밝게)
+    #64748B(항목명/단위, 차분한 회색)              → #94A3B8 (slate-400)
 */
 @layer components {
+  /* 섹션 제목: 현재 시세 / 일별 주가 및 거래 현황 */
+  .section-title {
+    @apply text-[18px] sm:text-[20px] font-bold text-slate-100;
+    letter-spacing: -0.02em;
+  }
+
+  /* 카드 항목명: 시가, 거래량, 고가 등 */
   .metric-label {
-    @apply text-[13px] sm:text-[14px] font-semibold text-slate-300 tracking-wide whitespace-nowrap;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.4;
+    color: #94a3b8;
     opacity: 1;
+    white-space: nowrap;
+  }
+  @media (min-width: 640px) {
+    .metric-label {
+      font-size: 14px;
+    }
   }
 
+  /* 일반 지표 숫자: 시가/고가/저가/거래량/거래대금/시가총액 */
   .metric-value {
-    @apply text-[16px] sm:text-[18px] font-bold tabular-nums text-slate-50;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
     line-height: 1.25;
-    letter-spacing: -0.01em;
+    color: #e2e8f0;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+  @media (min-width: 640px) {
+    .metric-value {
+      font-size: 18px;
+      font-weight: 650;
+    }
   }
 
-  .metric-value-lg {
-    @apply text-[18px] sm:text-[20px] font-bold tabular-nums text-slate-50;
+  /* 중요한 숫자: 일별 현황의 종가 등 */
+  .metric-value-primary {
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
     line-height: 1.25;
-    letter-spacing: -0.01em;
+    color: #f8fafc;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+  @media (min-width: 640px) {
+    .metric-value-primary {
+      font-size: 24px;
+    }
   }
 
+  /* 투자자별 순매수 숫자 (개인/외국인/기관/기타) */
+  .investor-value {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+  @media (min-width: 640px) {
+    .investor-value {
+      font-size: 18px;
+    }
+  }
+
+  /* 단위: 주, 억원, ₩ 등 */
   .metric-unit {
-    @apply text-[13px] sm:text-[14px] font-semibold text-slate-300;
-    letter-spacing: 0;
+    font-size: 0.78em;
+    font-weight: 500;
+    color: #94a3b8;
+    margin-left: 3px;
+    letter-spacing: normal;
+    white-space: nowrap;
   }
 
+  /* 메인 현재 주가 */
   .current-price {
-    @apply text-[36px] sm:text-[46px] font-extrabold tabular-nums text-slate-50;
-    line-height: 1.15;
-    letter-spacing: -0.01em;
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.1;
+    color: #f8fafc;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+  @media (min-width: 640px) {
+    .current-price {
+      font-size: 44px;
+    }
   }
 
+  /* 등락 금액 / 등락률 */
   .price-change {
-    @apply text-sm sm:text-base font-bold tabular-nums;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
   }
-
-  .price-change-lg {
-    @apply text-lg sm:text-xl font-bold tabular-nums;
+  @media (min-width: 640px) {
+    .price-change {
+      font-size: 16px;
+    }
   }
 }
