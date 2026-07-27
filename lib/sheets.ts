@@ -92,6 +92,22 @@ const num = (v: string | undefined) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const numOrNull = (v: string | undefined) => {
+  if (v === undefined || v === null || v.trim() === "") return null;
+  const n = Number(String(v).replace(/,/g, ""));
+  return Number.isFinite(n) ? n : null;
+};
+
+// fetch 응답을 항상 UTF-8로 명시적으로 디코딩 (브라우저/서버가 인코딩을 잘못 추측해서
+// 한글이 깨지는 문제를 원천 차단하기 위함 - 구글시트 게시 CSV는 UTF-8이 맞지만
+// Content-Type에 charset이 안 붙어있으면 자동판별이 틀릴 수 있음)
+async function fetchCsvText(url: string): Promise<string | null> {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) return null;
+  const buf = await res.arrayBuffer();
+  return new TextDecoder("utf-8").decode(buf);
+}
+
 export async function getDailyData(): Promise<DailyRow[]> {
   const url = process.env.DAILY_CSV_URL;
   if (!url) {
@@ -99,12 +115,11 @@ export async function getDailyData(): Promise<DailyRow[]> {
     return [];
   }
 
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    console.error("일별 데이터 조회 실패:", res.status);
+  const text = await fetchCsvText(url);
+  if (text === null) {
+    console.error("일별 데이터 조회 실패");
     return [];
   }
-  const text = await res.text();
   const rows = parseCsv(text);
   const [, ...dataRows] = rows; // 첫 행은 헤더
 
@@ -142,12 +157,11 @@ export async function getIntradayData(): Promise<IntradayRow[]> {
     return [];
   }
 
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    console.error("장중 시세 조회 실패:", res.status);
+  const text = await fetchCsvText(url);
+  if (text === null) {
+    console.error("장중 시세 조회 실패");
     return [];
   }
-  const text = await res.text();
   const rows = parseCsv(text);
   const [, ...dataRows] = rows;
 
@@ -163,4 +177,108 @@ export async function getIntradayData(): Promise<IntradayRow[]> {
     amt: num(r[8]),
     mcap: num(r[9]),
   }));
+}
+
+// --- 주간 주가동향 (weekly.gs가 매주 월요일에 채워주는 데이터) ---
+
+export type WeeklyPriceRow = {
+  reportDate: string;
+  refFriday: string;
+  prevFriday: string;
+  category: "index" | "domestic" | "us" | string;
+  name: string;
+  code: string;
+  close: number | null;
+  prevClose: number | null;
+  weekHigh: number | null;
+  weekLow: number | null;
+  ret1w: number | null;
+  ret1m: number | null;
+  ret3m: number | null;
+  retYtd: number | null;
+  ref1mClose: number | null;
+  ref3mClose: number | null;
+  refYtdClose: number | null;
+};
+
+export type WeeklyNewsRow = {
+  reportDate: string;
+  name: string;
+  title: string;
+  titleOriginal: string;
+  source: string;
+  pubDate: string;
+  link: string;
+  outletCount: number;
+};
+
+export async function getWeeklyPrices(): Promise<WeeklyPriceRow[]> {
+  const url = process.env.WEEKLY_PRICES_CSV_URL;
+  if (!url) {
+    console.warn("WEEKLY_PRICES_CSV_URL 환경변수가 설정되지 않았습니다.");
+    return [];
+  }
+
+  const text = await fetchCsvText(url);
+  if (text === null) {
+    console.error("주간 시세 조회 실패");
+    return [];
+  }
+  const rows = parseCsv(text);
+  const [, ...dataRows] = rows;
+
+  return dataRows.map((r) => ({
+    reportDate: r[0],
+    refFriday: r[1],
+    prevFriday: r[2],
+    category: r[3],
+    name: r[4],
+    code: r[5],
+    close: numOrNull(r[6]),
+    prevClose: numOrNull(r[7]),
+    weekHigh: numOrNull(r[8]),
+    weekLow: numOrNull(r[9]),
+    ret1w: numOrNull(r[10]),
+    ret1m: numOrNull(r[11]),
+    ret3m: numOrNull(r[12]),
+    retYtd: numOrNull(r[13]),
+    ref1mClose: numOrNull(r[14]),
+    ref3mClose: numOrNull(r[15]),
+    refYtdClose: numOrNull(r[16]),
+  }));
+}
+
+export async function getWeeklyNews(): Promise<WeeklyNewsRow[]> {
+  const url = process.env.WEEKLY_NEWS_CSV_URL;
+  if (!url) {
+    console.warn("WEEKLY_NEWS_CSV_URL 환경변수가 설정되지 않았습니다.");
+    return [];
+  }
+
+  const text = await fetchCsvText(url);
+  if (text === null) {
+    console.error("주간 뉴스 조회 실패");
+    return [];
+  }
+  const rows = parseCsv(text);
+  const [, ...dataRows] = rows;
+
+  return dataRows.map((r) => ({
+    reportDate: r[0],
+    name: r[1],
+    title: r[2],
+    titleOriginal: r[3],
+    source: r[4],
+    pubDate: r[5],
+    link: r[6],
+    outletCount: num(r[7]),
+  }));
+}
+
+// 가장 최근 report_date 하나만 남기기 (weekly_prices/weekly_news는 매주 계속 누적되므로,
+// 화면에는 최신 리포트 한 주 분량만 보여줌)
+export function latestReportOnly<T extends { reportDate: string }>(rows: T[]): T[] {
+  if (!rows.length) return [];
+  const latest = rows.reduce((a, b) => (b.reportDate > a ? b.reportDate : a), rows[0].reportDate);
+  return rows.filter((r) => r.reportDate === latest);
 }

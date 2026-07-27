@@ -1,14 +1,23 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import UnderConstruction from "@/components/UnderConstruction";
+import WeeklyDashboard from "@/components/WeeklyDashboard";
+import { getWeeklyPrices, getWeeklyNews, latestReportOnly } from "@/lib/sheets";
 
-export default function WeeklyPage() {
+// 접속할 때마다 최신 주간 데이터를 다시 가져옴
+export const dynamic = "force-dynamic";
+
+export default async function WeeklyPage() {
+  const [allPrices, allNews] = await Promise.all([
+    getWeeklyPrices(),
+    getWeeklyNews(),
+  ]);
+
+  // weekly_prices/weekly_news는 매주 계속 누적되므로, 가장 최근 리포트 한 주 분량만 표시
+  const prices = latestReportOnly(allPrices);
+  const news = latestReportOnly(allNews);
+
   return (
     <DashboardLayout title="이노스페이스 주간 주가 및 매매 동향">
-      <UnderConstruction
-        title="주간 주가 및 매매 동향"
-        message="현재 주간 주가 및 매매 동향 페이지를 제작 중입니다."
-        subMessage="데이터 집계 기준과 화면 구성이 완료되는 대로 제공할 예정입니다."
-      />
+      <WeeklyDashboard prices={prices} news={news} />
     </DashboardLayout>
   );
 }
