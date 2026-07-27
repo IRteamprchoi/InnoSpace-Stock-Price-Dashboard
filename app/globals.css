@@ -9,3 +9,46 @@ html {
 body {
   background-color: #020617;
 }
+
+/*
+  공통 타이포그래피 클래스 (가독성 개선)
+  참고: 원본 스펙은 밝은 배경(#0F172A 텍스트) 기준이었으나, 이 대시보드는 어두운 배경이라
+  같은 "선명함/두께" 의도를 유지하면서 색상만 어두운 테마에 맞게 반전했습니다.
+*/
+@layer components {
+  .metric-label {
+    @apply text-[13px] sm:text-[14px] font-semibold text-slate-300 tracking-wide whitespace-nowrap;
+    opacity: 1;
+  }
+
+  .metric-value {
+    @apply text-[16px] sm:text-[18px] font-bold tabular-nums text-slate-50;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+
+  .metric-value-lg {
+    @apply text-[18px] sm:text-[20px] font-bold tabular-nums text-slate-50;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+
+  .metric-unit {
+    @apply text-[13px] sm:text-[14px] font-semibold text-slate-300;
+    letter-spacing: 0;
+  }
+
+  .current-price {
+    @apply text-[36px] sm:text-[46px] font-extrabold tabular-nums text-slate-50;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+  }
+
+  .price-change {
+    @apply text-sm sm:text-base font-bold tabular-nums;
+  }
+
+  .price-change-lg {
+    @apply text-lg sm:text-xl font-bold tabular-nums;
+  }
+}
