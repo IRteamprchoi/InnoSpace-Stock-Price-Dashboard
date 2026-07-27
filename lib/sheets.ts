@@ -279,6 +279,34 @@ export async function getWeeklyNews(): Promise<WeeklyNewsRow[]> {
   }));
 }
 
+export type UsStockHistoryRow = {
+  symbol: string;
+  date: string;
+  close: number;
+};
+
+export async function getUsStockHistory(): Promise<UsStockHistoryRow[]> {
+  const url = process.env.US_STOCK_HISTORY_CSV_URL;
+  if (!url) {
+    console.warn("US_STOCK_HISTORY_CSV_URL 환경변수가 설정되지 않았습니다.");
+    return [];
+  }
+
+  const text = await fetchCsvText(url);
+  if (text === null) {
+    console.error("해외 종목 이력 조회 실패");
+    return [];
+  }
+  const rows = parseCsv(text);
+  const [, ...dataRows] = rows;
+
+  return dataRows.map((r) => ({
+    symbol: r[0],
+    date: r[1],
+    close: num(r[5]),
+  }));
+}
+
 // 가장 최근 report_date 하나만 남기기 (weekly_prices/weekly_news는 매주 계속 누적되므로,
 // 화면에는 최신 리포트 한 주 분량만 보여줌)
 export function latestReportOnly<T extends { reportDate: string }>(rows: T[]): T[] {
