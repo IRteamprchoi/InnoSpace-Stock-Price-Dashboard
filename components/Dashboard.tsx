@@ -10,6 +10,20 @@ const fmtSigned = (n: number) => n == null ? "-" : (n > 0 ? "+" : "") + n.toLoca
 const fmtWon = (n: number) => n == null ? "-" : "₩" + n.toLocaleString("ko-KR");
 const fmtEok = (n: number) => n == null ? "-" : (n / 100000000).toLocaleString("ko-KR", { maximumFractionDigits: 0 }) + "억원";
 
+// 숫자와 단위(원/주/억원)를 분리해서 렌더링하기 위한 헬퍼 - 단위는 .metric-unit로 살짝 작게 표시
+function Won({ n }: { n: number }) {
+  if (n == null) return <>-</>;
+  return <><span className="metric-unit">₩</span>{n.toLocaleString("ko-KR")}</>;
+}
+function Shares({ n }: { n: number }) {
+  if (n == null) return <>-</>;
+  return <>{n.toLocaleString("ko-KR")}<span className="metric-unit ml-0.5">주</span></>;
+}
+function Eok({ n }: { n: number }) {
+  if (n == null) return <>-</>;
+  return <>{(n / 100000000).toLocaleString("ko-KR", { maximumFractionDigits: 0 })}<span className="metric-unit ml-0.5">억원</span></>;
+}
+
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
 function koreanDateLabel(dateStr: string) {
@@ -41,24 +55,24 @@ function isMarketOpenNow() {
 function ChangeTag({ value, pct, size = "base" }: { value: number; pct?: number | null; size?: "base" | "lg" }) {
   const up = value > 0;
   const flat = value === 0;
-  const color = flat ? "text-slate-400" : up ? "text-red-400" : "text-blue-400";
+  const color = flat ? "text-slate-300" : up ? "text-red-400" : "text-blue-400";
   const Icon = up ? TrendingUp : TrendingDown;
-  const textSize = size === "lg" ? "text-lg" : "text-sm";
+  const sizeClass = size === "lg" ? "price-change-lg" : "price-change";
   return (
-    <span className={`inline-flex items-center gap-1 font-mono ${textSize} ${color}`}>
-      {!flat && <Icon size={size === "lg" ? 18 : 14} />}
+    <span className={`inline-flex items-center gap-1 ${sizeClass} ${color}`}>
+      {!flat && <Icon size={size === "lg" ? 20 : 15} strokeWidth={2.5} />}
       {up ? "+" : ""}{fmt(value)}
-      {pct != null && <span className="opacity-80">({up ? "+" : ""}{pct.toFixed(2)}%)</span>}
+      {pct != null && <span>({up ? "+" : ""}{pct.toFixed(2)}%)</span>}
     </span>
   );
 }
 
-function StatCard({ label, value, sub, highlight }: { label: string; value: React.ReactNode; sub?: React.ReactNode; highlight?: string }) {
+function StatCard({ label, value, sub, highlight, big }: { label: string; value: React.ReactNode; sub?: React.ReactNode; highlight?: string; big?: boolean }) {
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-lg px-4 py-3 flex flex-col gap-1 min-w-0">
-      <span className="text-[11px] uppercase tracking-wider text-slate-500 font-medium whitespace-nowrap">{label}</span>
-      <span className={`font-mono text-lg tabular-nums ${highlight || "text-slate-100"}`}>{value}</span>
-      {sub && <span className="text-xs text-slate-500">{sub}</span>}
+    <div className="bg-slate-900/80 border border-slate-700 rounded-lg px-4 py-3.5 flex flex-col gap-1.5 min-w-0">
+      <span className="metric-label">{label}</span>
+      <span className={`${big ? "metric-value-lg" : "metric-value"} ${highlight || "text-slate-50"}`}>{value}</span>
+      {sub && <span className="text-[13px] sm:text-[14px] font-semibold text-slate-300 mt-0.5">{sub}</span>}
     </div>
   );
 }
@@ -380,23 +394,23 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
                 </>
               }
             />
-            <div className="bg-gradient-to-br from-slate-900 to-slate-900/40 border border-slate-800 rounded-xl p-5 flex-1 flex flex-col justify-between gap-4">
+            <div className="bg-gradient-to-br from-slate-900 to-slate-900/60 border border-slate-700 rounded-xl p-5 flex-1 flex flex-col justify-between gap-5">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <div className="text-4xl font-mono font-semibold tabular-nums text-slate-50">{fmtWon(live.close)}</div>
-                  <div className="mt-1"><ChangeTag value={live.chg} pct={live.chgPct} size="lg" /></div>
+                  <div className="current-price"><Won n={live.close} /></div>
+                  <div className="mt-2"><ChangeTag value={live.chg} pct={live.chgPct} size="lg" /></div>
                 </div>
-                <div className="text-xs text-slate-500 text-right">
-                  <div>전일종가 <span className="font-mono text-slate-300">{fmtWon(prevClose)}</span></div>
+                <div className="text-[13px] font-semibold text-slate-300 text-right">
+                  <div>전일종가 <span className="metric-unit text-slate-200">{fmtWon(prevClose)}</span></div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <StatCard label="시가" value={fmtWon(live.open)} />
-                <StatCard label="거래량" value={fmt(live.vol) + "주"} />
-                <StatCard label="고가" value={fmtWon(live.high)} highlight="text-red-300" />
-                <StatCard label="거래대금" value={fmtEok(live.amt)} />
-                <StatCard label="저가" value={fmtWon(live.low)} highlight="text-blue-300" />
-                <StatCard label="시가총액" value={fmtEok(live.mcap)} />
+                <StatCard label="시가" value={<Won n={live.open} />} />
+                <StatCard label="거래량" value={<Shares n={live.vol} />} />
+                <StatCard label="고가" value={<Won n={live.high} />} highlight="text-red-300" />
+                <StatCard label="거래대금" value={<Eok n={live.amt} />} />
+                <StatCard label="저가" value={<Won n={live.low} />} highlight="text-blue-300" />
+                <StatCard label="시가총액" value={<Eok n={live.mcap} />} />
               </div>
             </div>
           </section>
@@ -411,12 +425,12 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
                 </>
               }
             />
-            <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5 flex-1 flex flex-col justify-between gap-3">
+            <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5 flex-1 flex flex-col justify-between gap-3">
               <div className="grid grid-cols-2 gap-3">
-                <StatCard label="종가" value={fmtWon(latest.close)} sub={<ChangeTag value={latest.chg} pct={latest.chgPct} />} />
-                <StatCard label="총 거래량" value={fmt(latest.vol) + "주"} />
-                <StatCard label="시가총액" value={fmtEok(latest.mcap)} />
-                <StatCard label="거래대금" value={fmtEok(latest.amt)} />
+                <StatCard big label="종가" value={<Won n={latest.close} />} sub={<ChangeTag value={latest.chg} pct={latest.chgPct} />} />
+                <StatCard big label="총 거래량" value={<Shares n={latest.vol} />} />
+                <StatCard big label="시가총액" value={<Eok n={latest.mcap} />} />
+                <StatCard big label="거래대금" value={<Eok n={latest.amt} />} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <StatCard label="외국인 순매수" value={fmtSigned(latest.foreign)} highlight={flowColor(latest.foreign)} />
