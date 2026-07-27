@@ -19,6 +19,13 @@ function fmt(n: number | null) {
   return n.toLocaleString("ko-KR");
 }
 
+// 국내는 억원, 해외는 백만달러 단위로 시가총액 표시
+function fmtMarketCap(n: number | null, isUs: boolean) {
+  if (n == null) return "-";
+  if (isUs) return "$" + (n / 1000000).toLocaleString("ko-KR", { maximumFractionDigits: 0 }) + "M";
+  return (n / 100000000).toLocaleString("ko-KR", { maximumFractionDigits: 0 }) + "억원";
+}
+
 function PctCell({ v }: { v: number | null }) {
   if (v == null) return <span className="text-slate-600">-</span>;
   const up = v > 0;
@@ -32,7 +39,7 @@ function PctCell({ v }: { v: number | null }) {
   );
 }
 
-function PriceTable({ rows }: { rows: WeeklyPriceRow[] }) {
+function CompareTable({ rows }: { rows: WeeklyPriceRow[] }) {
   return (
     <div className="bg-slate-900/70 border border-slate-700 rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
@@ -40,6 +47,8 @@ function PriceTable({ rows }: { rows: WeeklyPriceRow[] }) {
           <thead>
             <tr className="border-b border-slate-700 text-slate-400">
               <th className="text-left font-semibold px-3 py-2.5 sticky left-0 bg-slate-900 whitespace-nowrap">종목명</th>
+              <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">상장주식수</th>
+              <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">시가총액</th>
               <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">종가</th>
               <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">주간 최고</th>
               <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">주간 최저</th>
@@ -50,21 +59,37 @@ function PriceTable({ rows }: { rows: WeeklyPriceRow[] }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.code} className="border-b border-slate-800/60 hover:bg-slate-800/30 font-mono">
-                <td className="px-3 py-2 text-left text-slate-100 font-semibold sticky left-0 bg-slate-900/70 whitespace-nowrap">{r.name}</td>
-                <td className="px-3 py-2 text-right text-slate-100 tabular-nums">{fmt(r.close)}</td>
-                <td className="px-3 py-2 text-right text-slate-400 tabular-nums">{fmt(r.weekHigh)}</td>
-                <td className="px-3 py-2 text-right text-slate-400 tabular-nums">{fmt(r.weekLow)}</td>
-                <td className="px-3 py-2 text-right"><PctCell v={r.ret1w} /></td>
-                <td className="px-3 py-2 text-right"><PctCell v={r.ret1m} /></td>
-                <td className="px-3 py-2 text-right"><PctCell v={r.ret3m} /></td>
-                <td className="px-3 py-2 text-right"><PctCell v={r.retYtd} /></td>
-              </tr>
-            ))}
+            {rows.map((r) => {
+              const isInnospace = r.code === "462350";
+              const isUs = r.category === "us";
+              const isIndex = r.category === "index";
+              return (
+                <tr
+                  key={`${r.category}-${r.code}`}
+                  className={`border-b border-slate-800/60 font-mono ${
+                    isInnospace ? "bg-amber-400/10 border-l-2 border-l-amber-400" : "hover:bg-slate-800/30"
+                  }`}
+                >
+                  <td className={`px-3 py-2 text-left whitespace-nowrap sticky left-0 ${
+                    isInnospace ? "bg-slate-900/95 text-amber-300 font-bold" : "bg-slate-900/70 text-slate-100 font-semibold"
+                  }`}>
+                    {r.name}
+                  </td>
+                  <td className="px-3 py-2 text-right text-slate-400 tabular-nums">{isIndex ? "-" : fmt(r.shares)}</td>
+                  <td className="px-3 py-2 text-right text-slate-400 tabular-nums">{isIndex ? "-" : fmtMarketCap(r.marketCap, isUs)}</td>
+                  <td className="px-3 py-2 text-right text-slate-100 tabular-nums">{fmt(r.close)}</td>
+                  <td className="px-3 py-2 text-right text-slate-400 tabular-nums">{fmt(r.weekHigh)}</td>
+                  <td className="px-3 py-2 text-right text-slate-400 tabular-nums">{fmt(r.weekLow)}</td>
+                  <td className="px-3 py-2 text-right"><PctCell v={r.ret1w} /></td>
+                  <td className="px-3 py-2 text-right"><PctCell v={r.ret1m} /></td>
+                  <td className="px-3 py-2 text-right"><PctCell v={r.ret3m} /></td>
+                  <td className="px-3 py-2 text-right"><PctCell v={r.retYtd} /></td>
+                </tr>
+              );
+            })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-slate-500">데이터가 없습니다</td>
+                <td colSpan={10} className="px-3 py-6 text-center text-slate-500">데이터가 없습니다</td>
               </tr>
             )}
           </tbody>
@@ -81,7 +106,6 @@ function NewsSection({ news }: { news: WeeklyNewsRow[] }) {
       if (!map.has(n.name)) map.set(n.name, []);
       map.get(n.name)!.push(n);
     });
-    // 각 회사 안에서는 언론사 수(outlet_count) 많은 순
     map.forEach((arr) => arr.sort((a, b) => b.outletCount - a.outletCount));
     return Array.from(map.entries());
   }, [news]);
@@ -122,6 +146,15 @@ function NewsSection({ news }: { news: WeeklyNewsRow[] }) {
   );
 }
 
+// 원본 리포트와 같은 순서: 지수 -> 해외 -> 이노스페이스 -> 국내 나머지, 전부 하나의 표로
+function orderForComparison(rows: WeeklyPriceRow[]): WeeklyPriceRow[] {
+  const indices = rows.filter((r) => r.category === "index");
+  const us = rows.filter((r) => r.category === "us");
+  const innospace = rows.filter((r) => r.code === "462350");
+  const otherDomestic = rows.filter((r) => r.category === "domestic" && r.code !== "462350");
+  return [...indices, ...us, ...innospace, ...otherDomestic];
+}
+
 export default function WeeklyDashboard({
   prices,
   news,
@@ -129,9 +162,7 @@ export default function WeeklyDashboard({
   prices: WeeklyPriceRow[];
   news: WeeklyNewsRow[];
 }) {
-  const indices = prices.filter((p) => p.category === "index");
-  const domestic = prices.filter((p) => p.category === "domestic");
-  const us = prices.filter((p) => p.category === "us");
+  const orderedRows = useMemo(() => orderForComparison(prices), [prices]);
   const refFriday = prices[0]?.refFriday;
   const reportDate = prices[0]?.reportDate;
 
@@ -147,7 +178,7 @@ export default function WeeklyDashboard({
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-4">
         <div className="flex items-center gap-3 mb-1">
           <span className="w-1 h-4 bg-amber-400 rounded-sm shrink-0" />
           <h2 className="section-title">우주항공기업 주가 동향</h2>
@@ -157,22 +188,16 @@ export default function WeeklyDashboard({
         </p>
       </div>
 
-      <div className="flex flex-col gap-8 mb-10">
-        <div>
-          <h3 className="text-[14px] font-bold text-slate-300 mb-2">지수</h3>
-          <PriceTable rows={indices} />
-        </div>
-        <div>
-          <h3 className="text-[14px] font-bold text-slate-300 mb-2">국내 종목</h3>
-          <PriceTable rows={domestic} />
-        </div>
-        <div>
-          <h3 className="text-[14px] font-bold text-slate-300 mb-2">해외 종목</h3>
-          <PriceTable rows={us} />
-          <p className="text-[11px] text-slate-600 mt-2">
-            * 해외 종목은 자체 수집 이력이 쌓이는 대로 1개월/3개월/YTD가 채워집니다. 신규 상장 종목은 상장 이전 기간의 값이 비어있을 수 있습니다.
-          </p>
-        </div>
+      <p className="text-[12px] text-slate-500 mb-3 pl-3">
+        <span className="inline-block w-2.5 h-2.5 bg-amber-400/40 border border-amber-400 rounded-sm align-middle mr-1.5" />
+        음영 표시된 행이 이노스페이스입니다
+      </p>
+
+      <div className="mb-10">
+        <CompareTable rows={orderedRows} />
+        <p className="text-[11px] text-slate-600 mt-2">
+          * 해외 종목은 자체 수집 이력이 쌓이는 대로 1개월/3개월/YTD가 채워집니다. 신규 상장 종목은 상장 이전 기간의 값이 비어있을 수 있습니다.
+        </p>
       </div>
 
       <div className="flex items-center gap-3 mb-4">
