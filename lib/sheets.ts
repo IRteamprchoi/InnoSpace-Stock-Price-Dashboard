@@ -283,7 +283,7 @@ export async function getWeeklyNews(): Promise<WeeklyNewsRow[]> {
 // 화면에는 최신 리포트 한 주 분량만 보여줌)
 export function latestReportOnly<T extends { reportDate: string }>(rows: T[]): T[] {
   if (!rows.length) return [];
-  const latest = rows.reduce((a, b) => (b.reportDate > a ? b : a), rows[0]).reportDate;
+  const latest = rows.reduce((a, b) => (b.reportDate > a.reportDate ? b : a), rows[0]).reportDate;
   return rows.filter((r) => r.reportDate === latest);
 }
 
