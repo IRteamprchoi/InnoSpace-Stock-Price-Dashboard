@@ -56,32 +56,38 @@ export default function MiniStockChart({
   height?: number;
 }) {
   const prepared = useMemo(() => {
-    return data.map((d, i) => ({
+    const rows = data.map((d, i) => ({
       date: d.date,
       close: d.close,
       volume: d.volume ?? null,
       dayChgPct: i > 0 && data[i - 1].close ? ((d.close - data[i - 1].close) / data[i - 1].close) * 100 : null,
-    }));
+    })) as any[];
+
+    // 요일별 구간 색상: 전일 대비 상승한 날은 빨강, 하락한 날은 파랑 (일간 대시보드 "1주일" 스타일)
+    const segs: { key: string; color: string }[] = [];
+    for (let i = 1; i < rows.length; i++) {
+      const key = `seg${i}`;
+      const up = data[i].close >= data[i - 1].close;
+      rows[i - 1][key] = data[i - 1].close;
+      rows[i][key] = data[i].close;
+      segs.push({ key, color: up ? UP_COLOR : DOWN_COLOR });
+    }
+    return { rows, segs };
   }, [data]);
 
-  const { yMin, yMax, lineColor, refPrice, hasVolume, volMax, ticks } = useMemo(() => {
-    const closes = prepared.map((d) => d.close);
+  const { yMin, yMax, refPrice, hasVolume, volMax, ticks } = useMemo(() => {
+    const closes = prepared.rows.map((d) => d.close);
     const max = Math.max(...closes);
     const min = Math.min(...closes);
     const pad = (max - min) * 0.08 || Math.max(max * 0.02, 1); // 고가=저가인 경우 대비 최소 범위 확보
-    const first = prepared[0]?.close ?? 0;
-    const last = prepared[prepared.length - 1]?.close ?? 0;
-    const up = last > first;
-    const flat = last === first;
 
-    const vols = prepared.map((d) => d.volume || 0);
+    const vols = prepared.rows.map((d) => d.volume || 0);
     const volMax = Math.max(...vols, 0);
 
     return {
       yMin: min - pad,
       yMax: max + pad,
-      lineColor: flat ? FLAT_COLOR : up ? UP_COLOR : DOWN_COLOR,
-      refPrice: first, // 우선순위 1: 직전 거래일 종가 = 이 구간 시작 전날 종가가 없으므로 구간 첫 값을 기준으로 사용
+      refPrice: prepared.rows[0]?.close ?? 0, // 우선순위 1: 직전 거래일 종가 = 이 구간 시작 전날 종가가 없으므로 구간 첫 값을 기준으로 사용
       hasVolume: volMax > 0,
       volMax,
       ticks: [min, (min + max) / 2, max],
@@ -90,12 +96,11 @@ export default function MiniStockChart({
 
   if (!data || data.length < 2) return <StockChartLoading height={height} />;
 
-  const priceHeightRatio = hasVolume ? 0.8 : 1;
   const volDomainMax = hasVolume ? volMax / 0.2 : 1;
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <ComposedChart data={prepared} margin={{ top: 8, right: 4, left: 0, bottom: 4 }}>
+      <ComposedChart data={prepared.rows} margin={{ top: 8, right: 4, left: 0, bottom: 4 }}>
         <XAxis
           dataKey="date"
           tick={{ fontSize: 10, fill: "#94a3b8" }}
@@ -135,16 +140,20 @@ export default function MiniStockChart({
           <Bar yAxisId="vol" dataKey="volume" fill="#64748b" fillOpacity={0.45} radius={[1, 1, 0, 0]} isAnimationActive={false} />
         )}
 
-        <Line
-          yAxisId="price"
-          type="linear"
-          dataKey="close"
-          stroke={lineColor}
-          strokeWidth={1.8}
-          dot={false}
-          activeDot={{ r: 3, fill: lineColor, stroke: "#0f172a", strokeWidth: 1 }}
-          isAnimationActive={false}
-        />
+        {prepared.segs.map((s) => (
+          <Line
+            key={s.key}
+            yAxisId="price"
+            type="linear"
+            dataKey={s.key}
+            stroke={s.color}
+            strokeWidth={1.8}
+            dot={false}
+            connectNulls={false}
+            activeDot={{ r: 3, fill: s.color, stroke: "#0f172a", strokeWidth: 1 }}
+            isAnimationActive={false}
+          />
+        ))}
 
         <Tooltip content={<StockChartTooltip isUs={isUs} />} cursor={{ stroke: "#334155", strokeWidth: 1 }} />
       </ComposedChart>
