@@ -283,6 +283,7 @@ export type UsStockHistoryRow = {
   symbol: string;
   date: string;
   close: number;
+  volume: number;
 };
 
 export async function getUsStockHistory(): Promise<UsStockHistoryRow[]> {
@@ -304,6 +305,7 @@ export async function getUsStockHistory(): Promise<UsStockHistoryRow[]> {
     symbol: r[0],
     date: r[1],
     close: num(r[5]),
+    volume: num(r[6]),
   }));
 }
 
