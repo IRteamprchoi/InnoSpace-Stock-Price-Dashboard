@@ -11,17 +11,18 @@ const fmtWon = (n: number) => n == null ? "-" : "₩" + n.toLocaleString("ko-KR"
 const fmtEok = (n: number) => n == null ? "-" : (n / 100000000).toLocaleString("ko-KR", { maximumFractionDigits: 0 }) + "억원";
 
 // 숫자와 단위(원/주/억원)를 분리해서 렌더링하기 위한 헬퍼 - 단위는 .metric-unit로 살짝 작게 표시
-function Won({ n }: { n: number }) {
+// unitClassName을 주면 단위 색상을 숫자와 동일하게(예: 고가=빨강, 저가=파랑) 맞출 수 있음
+function Won({ n, unitClassName }: { n: number; unitClassName?: string }) {
   if (n == null) return <>-</>;
-  return <><span className="metric-unit">₩</span>{n.toLocaleString("ko-KR")}</>;
+  return <><span className={`metric-unit ${unitClassName || ""}`}>₩</span>{n.toLocaleString("ko-KR")}</>;
 }
 function Shares({ n }: { n: number }) {
   if (n == null) return <>-</>;
-  return <>{n.toLocaleString("ko-KR")}<span className="metric-unit ml-0.5">주</span></>;
+  return <>{n.toLocaleString("ko-KR")}<span className="metric-unit">주</span></>;
 }
 function Eok({ n }: { n: number }) {
   if (n == null) return <>-</>;
-  return <>{(n / 100000000).toLocaleString("ko-KR", { maximumFractionDigits: 0 })}<span className="metric-unit ml-0.5">억원</span></>;
+  return <>{(n / 100000000).toLocaleString("ko-KR", { maximumFractionDigits: 0 })}<span className="metric-unit">억원</span></>;
 }
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
@@ -57,22 +58,30 @@ function ChangeTag({ value, pct, size = "base" }: { value: number; pct?: number 
   const flat = value === 0;
   const color = flat ? "text-slate-300" : up ? "text-red-400" : "text-blue-400";
   const Icon = up ? TrendingUp : TrendingDown;
-  const sizeClass = size === "lg" ? "price-change-lg" : "price-change";
   return (
-    <span className={`inline-flex items-center gap-1 ${sizeClass} ${color}`}>
-      {!flat && <Icon size={size === "lg" ? 20 : 15} strokeWidth={2.5} />}
-      {up ? "+" : ""}{fmt(value)}
+    <span className={`inline-flex items-center gap-1.5 price-change ${color}`}>
+      {!flat && <Icon size={size === "lg" ? 17 : 15} strokeWidth={2.5} />}
+      <span>{up ? "+" : ""}{fmt(value)}</span>
       {pct != null && <span>({up ? "+" : ""}{pct.toFixed(2)}%)</span>}
     </span>
   );
 }
 
-function StatCard({ label, value, sub, highlight, big }: { label: string; value: React.ReactNode; sub?: React.ReactNode; highlight?: string; big?: boolean }) {
+function StatCard({
+  label, value, sub, highlight, variant = "default",
+}: {
+  label: string; value: React.ReactNode; sub?: React.ReactNode; highlight?: string;
+  variant?: "default" | "primary" | "investor";
+}) {
+  const valueClass =
+    variant === "primary" ? "metric-value-primary" :
+    variant === "investor" ? "investor-value" :
+    "metric-value";
   return (
     <div className="bg-slate-900/80 border border-slate-700 rounded-lg px-4 py-3.5 flex flex-col gap-1.5 min-w-0">
       <span className="metric-label">{label}</span>
-      <span className={`${big ? "metric-value-lg" : "metric-value"} ${highlight || "text-slate-50"}`}>{value}</span>
-      {sub && <span className="text-[13px] sm:text-[14px] font-semibold text-slate-300 mt-0.5">{sub}</span>}
+      <span className={`${valueClass} ${highlight || "text-slate-100"}`}>{value}</span>
+      {sub && <span className="text-[13px] font-medium text-slate-400 mt-0.5">{sub}</span>}
     </div>
   );
 }
@@ -83,7 +92,7 @@ function SectionHeader({ title, meta, right }: { title: string; meta?: React.Rea
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <span className="w-1 h-4 bg-amber-400 rounded-sm shrink-0" />
-          <h2 className="text-sm font-semibold tracking-wide text-slate-100">{title}</h2>
+          <h2 className="section-title">{title}</h2>
         </div>
         {right}
       </div>
@@ -407,9 +416,9 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
               <div className="grid grid-cols-2 gap-3">
                 <StatCard label="시가" value={<Won n={live.open} />} />
                 <StatCard label="거래량" value={<Shares n={live.vol} />} />
-                <StatCard label="고가" value={<Won n={live.high} />} highlight="text-red-300" />
+                <StatCard label="고가" value={<Won n={live.high} unitClassName="text-red-300" />} highlight="text-red-300" />
                 <StatCard label="거래대금" value={<Eok n={live.amt} />} />
-                <StatCard label="저가" value={<Won n={live.low} />} highlight="text-blue-300" />
+                <StatCard label="저가" value={<Won n={live.low} unitClassName="text-blue-300" />} highlight="text-blue-300" />
                 <StatCard label="시가총액" value={<Eok n={live.mcap} />} />
               </div>
             </div>
@@ -427,23 +436,23 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
             />
             <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-5 flex-1 flex flex-col justify-between gap-3">
               <div className="grid grid-cols-2 gap-3">
-                <StatCard big label="종가" value={<Won n={latest.close} />} sub={<ChangeTag value={latest.chg} pct={latest.chgPct} />} />
-                <StatCard big label="총 거래량" value={<Shares n={latest.vol} />} />
-                <StatCard big label="시가총액" value={<Eok n={latest.mcap} />} />
-                <StatCard big label="거래대금" value={<Eok n={latest.amt} />} />
+                <StatCard variant="primary" label="종가" value={<Won n={latest.close} />} sub={<ChangeTag value={latest.chg} pct={latest.chgPct} />} />
+                <StatCard label="총 거래량" value={<Shares n={latest.vol} />} />
+                <StatCard label="시가총액" value={<Eok n={latest.mcap} />} />
+                <StatCard label="거래대금" value={<Eok n={latest.amt} />} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <StatCard label="외국인 순매수" value={fmtSigned(latest.foreign)} highlight={flowColor(latest.foreign)} />
-                <StatCard label="개인 순매수" value={fmtSigned(latest.indiv)} highlight={flowColor(latest.indiv)} />
-                <StatCard label="기관 순매수" value={fmtSigned(latest.inst)} highlight={flowColor(latest.inst)} />
-                <StatCard label="기타 순매수" value={fmtSigned(latest.etcTotal)} highlight={flowColor(latest.etcTotal)} />
+                <StatCard variant="investor" label="외국인 순매수" value={fmtSigned(latest.foreign)} highlight={flowColor(latest.foreign)} />
+                <StatCard variant="investor" label="개인 순매수" value={fmtSigned(latest.indiv)} highlight={flowColor(latest.indiv)} />
+                <StatCard variant="investor" label="기관 순매수" value={fmtSigned(latest.inst)} highlight={flowColor(latest.inst)} />
+                <StatCard variant="investor" label="기타 순매수" value={fmtSigned(latest.etcTotal)} highlight={flowColor(latest.etcTotal)} />
               </div>
             </div>
           </section>
         </div>
 
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h2 className="text-sm font-semibold text-slate-300">주가 추이</h2>
+          <h2 className="section-title">주가 추이</h2>
           <div className="flex gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1">
             {RANGES.map((r) => (
               <button
@@ -510,7 +519,7 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
         </div>
 
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h2 className="text-sm font-semibold text-slate-300">일별 주가 · 투자자별 순매수 상세</h2>
+          <h2 className="section-title">일별 주가 · 투자자별 순매수 상세</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowDetail((v) => !v)}
