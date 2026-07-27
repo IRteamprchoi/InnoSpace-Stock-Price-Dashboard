@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceDot } from "recharts";
-import { Rocket, TrendingUp, TrendingDown, Circle, ChevronDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Circle, ChevronDown } from "lucide-react";
 import type { DailyRow, IntradayRow } from "@/lib/sheets";
+import UpdateInfo from "./UpdateInfo";
 
 const fmt = (n: number) => n == null ? "-" : n.toLocaleString("ko-KR");
 const fmtSigned = (n: number) => n == null ? "-" : (n > 0 ? "+" : "") + n.toLocaleString("ko-KR");
@@ -101,25 +102,7 @@ function SectionHeader({ title, meta, right }: { title: string; meta?: React.Rea
   );
 }
 
-function HeaderClock() {
-  const [elapsed, setElapsed] = useState(0);
-  const [open] = useState(isMarketOpenNow());
-  useEffect(() => {
-    const t = setInterval(() => setElapsed((e) => e + 1), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const h = String(Math.floor(elapsed / 3600)).padStart(2, "0");
-  const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, "0");
-  const s = String(elapsed % 60).padStart(2, "0");
-  return (
-    <div className="flex items-center gap-2 font-mono text-xs text-slate-400">
-      <Circle size={8} className={open ? "fill-amber-400 text-amber-400 animate-pulse" : "fill-slate-600 text-slate-600"} />
-      <span>{open ? "장중" : "장마감"}</span>
-      <span className="text-slate-600">|</span>
-      <span>T+{h}:{m}:{s}</span>
-    </div>
-  );
-}
+
 
 const RANGES = [
   { key: "1W", label: "1주일", days: 6 },
@@ -160,7 +143,7 @@ function flowColor(v: number) {
   return "text-slate-500";
 }
 
-export default function Dashboard({ dailyData, intradayData }: { dailyData: DailyRow[]; intradayData: IntradayRow[] }) {
+export default function DailyDashboard({ dailyData, intradayData }: { dailyData: DailyRow[]; intradayData: IntradayRow[] }) {
   const [range, setRange] = useState<RangeKey>("1W");
   const [query, setQuery] = useState("");
   const [tableOpen, setTableOpen] = useState(false);
@@ -360,7 +343,7 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
 
   if (!latest || !live) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+      <div className="bg-slate-900/70 border border-slate-700 rounded-xl px-6 py-14 text-center">
         <p className="text-slate-400 text-sm">
           데이터를 아직 불러오지 못했습니다. 구글시트 게시 링크(DAILY_CSV_URL / INTRADAY_CSV_URL) 환경변수 설정을 확인해주세요.
         </p>
@@ -369,23 +352,8 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
-      <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
-
-        <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-amber-400/10 border border-amber-400/30 flex items-center justify-center">
-              <Rocket size={20} className="text-amber-400" />
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-50">이노스페이스 주가 및 매매 동향</h1>
-              <p className="text-xs text-slate-500 font-mono">462350 · KOSDAQ</p>
-            </div>
-          </div>
-          <HeaderClock />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10 items-stretch">
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10 items-stretch">
 
           <section className="h-full flex flex-col">
             <SectionHeader
@@ -452,7 +420,10 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
         </div>
 
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h2 className="section-title">주가 추이</h2>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className="section-title">주가 추이</h2>
+            <UpdateInfo text="매 5분마다 업데이트" />
+          </div>
           <div className="flex gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1">
             {RANGES.map((r) => (
               <button
@@ -519,7 +490,10 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
         </div>
 
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <h2 className="section-title">일별 주가 · 투자자별 순매수 상세</h2>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className="section-title">일별 주가 · 투자자별 순매수 상세</h2>
+            <UpdateInfo text="매일 18시 30분 업데이트" />
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowDetail((v) => !v)}
@@ -588,9 +562,6 @@ export default function Dashboard({ dailyData, intradayData }: { dailyData: Dail
             </button>
           )}
         </div>
-
-        <p className="text-[10px] text-slate-700 text-center pt-4">이노스페이스 IR팀 내부용 대시보드</p>
-      </div>
-    </div>
+    </>
   );
 }

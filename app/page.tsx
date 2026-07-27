@@ -1,20 +1,6 @@
-import Dashboard from "@/components/Dashboard";
-import AutoRefresh from "@/components/AutoRefresh";
-import { getDailyData, getIntradayData } from "@/lib/sheets";
+import { redirect } from "next/navigation";
 
-// 접속할 때마다 매번 새로 렌더링 (캐시된 오래된 데이터를 보여주지 않도록)
-export const dynamic = "force-dynamic";
-
-export default async function Home() {
-  const [dailyData, intradayData] = await Promise.all([
-    getDailyData(),
-    getIntradayData(),
-  ]);
-
-  return (
-    <>
-      <AutoRefresh intervalSeconds={60} />
-      <Dashboard dailyData={dailyData} intradayData={intradayData} />
-    </>
-  );
+// 최초 접속 시 일간 페이지가 기본으로 표시되도록 리다이렉트
+export default function Home() {
+  redirect("/daily");
 }
