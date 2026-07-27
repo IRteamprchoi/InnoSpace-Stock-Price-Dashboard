@@ -1,23 +1,11 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { TrendingUp, TrendingDown, ExternalLink, Clock } from "lucide-react";
+import { TrendingUp, TrendingDown, ExternalLink } from "lucide-react";
 import type { WeeklyPriceRow, WeeklyNewsRow, UsStockHistoryRow } from "@/lib/sheets";
 import type { FxRate } from "@/lib/fx";
-import MiniChart from "./MiniChart";
+import MiniStockChart from "./MiniStockChart";
 import PeerComparisonTable from "./PeerComparisonTable";
-
-function PlaceholderChart({ height = 88 }: { height?: number }) {
-  return (
-    <div
-      className="flex items-center justify-center gap-1.5 border border-dashed border-slate-700 rounded-md bg-slate-950/40"
-      style={{ height }}
-    >
-      <Clock size={12} className="text-slate-600" />
-      <span className="text-[11px] text-slate-600">데이터 수집 중</span>
-    </div>
-  );
-}
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -95,13 +83,26 @@ function NewsSection({ news }: { news: WeeklyNewsRow[] }) {
 }
 
 // 원본 리포트와 같은 순서: 지수 -> 해외 -> 이노스페이스 -> 국내 나머지, 전부 하나의 표로
+function RetArrow({ v }: { v: number | null }) {
+  if (v == null) return <span className="text-slate-600 text-[15px] font-bold">-</span>;
+  const up = v > 0;
+  const flat = v === 0;
+  const color = flat ? "text-slate-400" : up ? "text-red-400" : "text-blue-400";
+  const arrow = flat ? "―" : up ? "▲" : "▼";
+  return (
+    <span className={`inline-flex items-center gap-1 font-bold tabular-nums text-[15px] ${color}`}>
+      <span>{arrow}</span>{Math.abs(v).toFixed(2)}%
+    </span>
+  );
+}
+
 function ChartGrid({
   rows,
   innospaceHistory,
   usHistory,
 }: {
   rows: WeeklyPriceRow[];
-  innospaceHistory: { date: string; close: number }[];
+  innospaceHistory: { date: string; close: number; volume: number }[];
   usHistory: UsStockHistoryRow[];
 }) {
   // 지수는 원본 리포트에서도 개별 차트가 없었으므로 제외
@@ -112,31 +113,32 @@ function ChartGrid({
       {companies.map((r) => {
         const isInnospace = r.code === "462350";
         const isUs = r.category === "us";
-        let chartData: { date: string; close: number }[] = [];
+        let chartData: { date: string; close: number; volume?: number }[] = [];
 
         if (isInnospace) {
-          chartData = innospaceHistory.slice(-30); // 최근 약 1개월
+          chartData = innospaceHistory.slice(-20); // 최근 약 1개월(거래일 기준)
         } else if (isUs) {
           chartData = usHistory
             .filter((h) => h.symbol === r.code)
             .sort((a, b) => (a.date < b.date ? -1 : 1))
-            .slice(-90); // 최근 약 3개월
+            .slice(-20)
+            .map((h) => ({ date: h.date, close: h.close, volume: h.volume }));
         }
 
         return (
           <div
             key={`${r.category}-${r.code}`}
-            className={`bg-slate-900/70 border rounded-xl p-3.5 ${
-              isInnospace ? "border-amber-400/40" : "border-slate-700"
+            className={`bg-slate-900/60 border rounded-xl p-3.5 ${
+              isInnospace ? "border-amber-400/30" : "border-slate-700"
             }`}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className={`text-[13px] font-semibold ${isInnospace ? "text-amber-300" : "text-slate-200"}`}>
+            <div className="flex items-center justify-between mb-2.5 gap-2">
+              <span className={`text-[14px] font-semibold truncate ${isInnospace ? "text-amber-300" : "text-slate-200"}`}>
                 {r.name}
               </span>
-              <PctCell v={r.ret1w} />
+              <RetArrow v={r.ret1w} />
             </div>
-            {chartData.length >= 2 ? <MiniChart data={chartData} /> : <PlaceholderChart />}
+            <MiniStockChart data={chartData} isUs={isUs} />
           </div>
         );
       })}
@@ -161,7 +163,7 @@ export default function WeeklyDashboard({
 }: {
   prices: WeeklyPriceRow[];
   news: WeeklyNewsRow[];
-  innospaceHistory: { date: string; close: number }[];
+  innospaceHistory: { date: string; close: number; volume: number }[];
   usHistory: UsStockHistoryRow[];
   fx: FxRate | null;
 }) {
