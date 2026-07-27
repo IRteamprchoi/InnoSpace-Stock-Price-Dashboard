@@ -116,12 +116,12 @@ function ChartGrid({
         let chartData: { date: string; close: number; volume?: number }[] = [];
 
         if (isInnospace) {
-          chartData = innospaceHistory.slice(-20); // 최근 약 1개월(거래일 기준)
+          chartData = innospaceHistory.slice(-6); // 이번 리포트 기준 최근 1주일(약 5거래일)
         } else if (isUs) {
           chartData = usHistory
             .filter((h) => h.symbol === r.code)
             .sort((a, b) => (a.date < b.date ? -1 : 1))
-            .slice(-20)
+            .slice(-6)
             .map((h) => ({ date: h.date, close: h.close, volume: h.volume }));
         }
 
