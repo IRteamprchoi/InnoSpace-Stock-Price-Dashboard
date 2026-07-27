@@ -279,6 +279,21 @@ export async function getWeeklyNews(): Promise<WeeklyNewsRow[]> {
 // 화면에는 최신 리포트 한 주 분량만 보여줌)
 export function latestReportOnly<T extends { reportDate: string }>(rows: T[]): T[] {
   if (!rows.length) return [];
-  const latest = rows.reduce((a, b) => (b.reportDate > a ? b.reportDate : a), rows[0].reportDate);
+  const latest = rows.reduce((a, b) => (b.reportDate > a ? b : a), rows[0]).reportDate;
   return rows.filter((r) => r.reportDate === latest);
+}
+
+// 안전장치: 같은 날짜에 스크립트가 여러 번 실행되어 시트에 중복 행이 남아있어도,
+// 화면에는 종목/기사당 하나씩만 보이도록 방어적으로 중복 제거
+export function dedupeBy<T>(rows: T[], keyFn: (r: T) => string): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  rows.forEach((r) => {
+    const key = keyFn(r);
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(r);
+    }
+  });
+  return out;
 }
