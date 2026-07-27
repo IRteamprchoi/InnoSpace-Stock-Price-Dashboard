@@ -1,8 +1,21 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { TrendingUp, TrendingDown, ExternalLink } from "lucide-react";
-import type { WeeklyPriceRow, WeeklyNewsRow } from "@/lib/sheets";
+import { TrendingUp, TrendingDown, ExternalLink, Clock } from "lucide-react";
+import type { WeeklyPriceRow, WeeklyNewsRow, UsStockHistoryRow } from "@/lib/sheets";
+import MiniChart from "./MiniChart";
+
+function PlaceholderChart({ height = 64 }: { height?: number }) {
+  return (
+    <div
+      className="flex items-center justify-center gap-1.5 border border-dashed border-slate-700 rounded-md bg-slate-950/40"
+      style={{ height }}
+    >
+      <Clock size={12} className="text-slate-600" />
+      <span className="text-[11px] text-slate-600">데이터 수집 중</span>
+    </div>
+  );
+}
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -147,6 +160,55 @@ function NewsSection({ news }: { news: WeeklyNewsRow[] }) {
 }
 
 // 원본 리포트와 같은 순서: 지수 -> 해외 -> 이노스페이스 -> 국내 나머지, 전부 하나의 표로
+function ChartGrid({
+  rows,
+  innospaceHistory,
+  usHistory,
+}: {
+  rows: WeeklyPriceRow[];
+  innospaceHistory: { date: string; close: number }[];
+  usHistory: UsStockHistoryRow[];
+}) {
+  // 지수는 원본 리포트에서도 개별 차트가 없었으므로 제외
+  const companies = rows.filter((r) => r.category !== "index");
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {companies.map((r) => {
+        const isInnospace = r.code === "462350";
+        const isUs = r.category === "us";
+        let chartData: { date: string; close: number }[] = [];
+
+        if (isInnospace) {
+          chartData = innospaceHistory.slice(-30); // 최근 약 1개월
+        } else if (isUs) {
+          chartData = usHistory
+            .filter((h) => h.symbol === r.code)
+            .sort((a, b) => (a.date < b.date ? -1 : 1))
+            .slice(-90); // 최근 약 3개월
+        }
+
+        return (
+          <div
+            key={`${r.category}-${r.code}`}
+            className={`bg-slate-900/70 border rounded-xl p-3.5 ${
+              isInnospace ? "border-amber-400/40" : "border-slate-700"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className={`text-[13px] font-semibold ${isInnospace ? "text-amber-300" : "text-slate-200"}`}>
+                {r.name}
+              </span>
+              <PctCell v={r.ret1w} />
+            </div>
+            {chartData.length >= 2 ? <MiniChart data={chartData} /> : <PlaceholderChart />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function orderForComparison(rows: WeeklyPriceRow[]): WeeklyPriceRow[] {
   const indices = rows.filter((r) => r.category === "index");
   const us = rows.filter((r) => r.category === "us");
@@ -158,9 +220,13 @@ function orderForComparison(rows: WeeklyPriceRow[]): WeeklyPriceRow[] {
 export default function WeeklyDashboard({
   prices,
   news,
+  innospaceHistory,
+  usHistory,
 }: {
   prices: WeeklyPriceRow[];
   news: WeeklyNewsRow[];
+  innospaceHistory: { date: string; close: number }[];
+  usHistory: UsStockHistoryRow[];
 }) {
   const orderedRows = useMemo(() => orderForComparison(prices), [prices]);
   const refFriday = prices[0]?.refFriday;
@@ -198,6 +264,17 @@ export default function WeeklyDashboard({
         <p className="text-[11px] text-slate-600 mt-2">
           * 해외 종목은 자체 수집 이력이 쌓이는 대로 1개월/3개월/YTD가 채워집니다. 신규 상장 종목은 상장 이전 기간의 값이 비어있을 수 있습니다.
         </p>
+      </div>
+
+      <div className="flex items-center gap-3 mb-1">
+        <span className="w-1 h-4 bg-amber-400 rounded-sm shrink-0" />
+        <h2 className="section-title">종목별 주가 추이</h2>
+      </div>
+      <p className="text-[12px] text-slate-500 mb-4 pl-3">
+        이노스페이스·해외 3종목은 실제 추이, 나머지 국내 종목은 데이터가 쌓이는 대로 표시됩니다
+      </p>
+      <div className="mb-10">
+        <ChartGrid rows={orderedRows} innospaceHistory={innospaceHistory} usHistory={usHistory} />
       </div>
 
       <div className="flex items-center gap-3 mb-4">
