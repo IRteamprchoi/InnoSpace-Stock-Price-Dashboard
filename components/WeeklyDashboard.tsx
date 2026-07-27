@@ -3,9 +3,11 @@
 import React, { useMemo } from "react";
 import { TrendingUp, TrendingDown, ExternalLink, Clock } from "lucide-react";
 import type { WeeklyPriceRow, WeeklyNewsRow, UsStockHistoryRow } from "@/lib/sheets";
+import type { FxRate } from "@/lib/fx";
 import MiniChart from "./MiniChart";
+import PeerComparisonTable from "./PeerComparisonTable";
 
-function PlaceholderChart({ height = 64 }: { height?: number }) {
+function PlaceholderChart({ height = 72 }: { height?: number }) {
   return (
     <div
       className="flex items-center justify-center gap-1.5 border border-dashed border-slate-700 rounded-md bg-slate-950/40"
@@ -32,13 +34,6 @@ function fmt(n: number | null) {
   return n.toLocaleString("ko-KR");
 }
 
-// 국내는 억원, 해외는 백만달러 단위로 시가총액 표시
-function fmtMarketCap(n: number | null, isUs: boolean) {
-  if (n == null) return "-";
-  if (isUs) return "$" + (n / 1000000).toLocaleString("ko-KR", { maximumFractionDigits: 0 }) + "M";
-  return (n / 100000000).toLocaleString("ko-KR", { maximumFractionDigits: 0 }) + "억원";
-}
-
 function PctCell({ v }: { v: number | null }) {
   if (v == null) return <span className="text-slate-600">-</span>;
   const up = v > 0;
@@ -49,66 +44,6 @@ function PctCell({ v }: { v: number | null }) {
       {!flat && (up ? <TrendingUp size={12} /> : <TrendingDown size={12} />)}
       {up ? "+" : ""}{v.toFixed(2)}%
     </span>
-  );
-}
-
-function CompareTable({ rows }: { rows: WeeklyPriceRow[] }) {
-  return (
-    <div className="bg-slate-900/70 border border-slate-700 rounded-xl overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-[13px] border-collapse">
-          <thead>
-            <tr className="border-b border-slate-700 text-slate-400">
-              <th className="text-left font-semibold px-3 py-2.5 sticky left-0 bg-slate-900 whitespace-nowrap">종목명</th>
-              <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">상장주식수</th>
-              <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">시가총액</th>
-              <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">종가</th>
-              <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">주간 최고</th>
-              <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">주간 최저</th>
-              <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">1주</th>
-              <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">1개월</th>
-              <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">3개월</th>
-              <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">YTD</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const isInnospace = r.code === "462350";
-              const isUs = r.category === "us";
-              const isIndex = r.category === "index";
-              return (
-                <tr
-                  key={`${r.category}-${r.code}`}
-                  className={`border-b border-slate-800/60 font-mono ${
-                    isInnospace ? "bg-amber-400/10 border-l-2 border-l-amber-400" : "hover:bg-slate-800/30"
-                  }`}
-                >
-                  <td className={`px-3 py-2 text-left whitespace-nowrap sticky left-0 ${
-                    isInnospace ? "bg-slate-900/95 text-amber-300 font-bold" : "bg-slate-900/70 text-slate-100 font-semibold"
-                  }`}>
-                    {r.name}
-                  </td>
-                  <td className="px-3 py-2 text-right text-slate-400 tabular-nums">{isIndex ? "-" : fmt(r.shares)}</td>
-                  <td className="px-3 py-2 text-right text-slate-400 tabular-nums">{isIndex ? "-" : fmtMarketCap(r.marketCap, isUs)}</td>
-                  <td className="px-3 py-2 text-right text-slate-100 tabular-nums">{fmt(r.close)}</td>
-                  <td className="px-3 py-2 text-right text-slate-400 tabular-nums">{fmt(r.weekHigh)}</td>
-                  <td className="px-3 py-2 text-right text-slate-400 tabular-nums">{fmt(r.weekLow)}</td>
-                  <td className="px-3 py-2 text-right"><PctCell v={r.ret1w} /></td>
-                  <td className="px-3 py-2 text-right"><PctCell v={r.ret1m} /></td>
-                  <td className="px-3 py-2 text-right"><PctCell v={r.ret3m} /></td>
-                  <td className="px-3 py-2 text-right"><PctCell v={r.retYtd} /></td>
-                </tr>
-              );
-            })}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={10} className="px-3 py-6 text-center text-slate-500">데이터가 없습니다</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
   );
 }
 
@@ -222,15 +157,16 @@ export default function WeeklyDashboard({
   news,
   innospaceHistory,
   usHistory,
+  fx,
 }: {
   prices: WeeklyPriceRow[];
   news: WeeklyNewsRow[];
   innospaceHistory: { date: string; close: number }[];
   usHistory: UsStockHistoryRow[];
+  fx: FxRate | null;
 }) {
   const orderedRows = useMemo(() => orderForComparison(prices), [prices]);
-  const refFriday = prices[0]?.refFriday;
-  const reportDate = prices[0]?.reportDate;
+  const indices = useMemo(() => prices.filter((r) => r.category === "index"), [prices]);
 
   if (!prices.length) {
     return (
@@ -244,26 +180,23 @@ export default function WeeklyDashboard({
 
   return (
     <div>
-      <div className="mb-4">
-        <div className="flex items-center gap-3 mb-1">
-          <span className="w-1 h-4 bg-amber-400 rounded-sm shrink-0" />
-          <h2 className="section-title">우주항공기업 주가 동향</h2>
+      {/* 시장 지수 (참고용, 간단히) */}
+      {indices.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          {indices.map((idx) => (
+            <div key={idx.code} className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3 flex items-center justify-between">
+              <span className="metric-label">{idx.name}</span>
+              <div className="flex items-center gap-2">
+                <span className="metric-value text-slate-100">{idx.close?.toLocaleString("ko-KR")}</span>
+                <PctCell v={idx.ret1w} />
+              </div>
+            </div>
+          ))}
         </div>
-        <p className="text-[13px] text-slate-500 font-mono pl-3">
-          기준일 {koreanDateLabel(refFriday)} 종가 · {koreanDateLabel(reportDate)} 집계
-        </p>
-      </div>
-
-      <p className="text-[12px] text-slate-500 mb-3 pl-3">
-        <span className="inline-block w-2.5 h-2.5 bg-amber-400/40 border border-amber-400 rounded-sm align-middle mr-1.5" />
-        음영 표시된 행이 이노스페이스입니다
-      </p>
+      )}
 
       <div className="mb-10">
-        <CompareTable rows={orderedRows} />
-        <p className="text-[11px] text-slate-600 mt-2">
-          * 해외 종목은 자체 수집 이력이 쌓이는 대로 1개월/3개월/YTD가 채워집니다. 신규 상장 종목은 상장 이전 기간의 값이 비어있을 수 있습니다.
-        </p>
+        <PeerComparisonTable rows={orderedRows} fx={fx} />
       </div>
 
       <div className="flex items-center gap-3 mb-1">
