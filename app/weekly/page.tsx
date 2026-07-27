@@ -25,7 +25,7 @@ export default async function WeeklyPage() {
 
   const innospaceHistory = [...dailyData]
     .sort((a, b) => (a.d < b.d ? -1 : 1))
-    .map((d) => ({ date: d.d, close: d.close }));
+    .map((d) => ({ date: d.d, close: d.close, volume: d.vol }));
 
   return (
     <DashboardLayout title="이노스페이스 주간 주가 및 매매 동향">
