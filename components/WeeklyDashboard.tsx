@@ -7,7 +7,7 @@ import type { FxRate } from "@/lib/fx";
 import MiniChart from "./MiniChart";
 import PeerComparisonTable from "./PeerComparisonTable";
 
-function PlaceholderChart({ height = 72 }: { height?: number }) {
+function PlaceholderChart({ height = 88 }: { height?: number }) {
   return (
     <div
       className="flex items-center justify-center gap-1.5 border border-dashed border-slate-700 rounded-md bg-slate-950/40"
