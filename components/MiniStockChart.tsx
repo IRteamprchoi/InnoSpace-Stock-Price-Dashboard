@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { ComposedChart, Line, Bar, XAxis, YAxis, ReferenceLine, Tooltip, ResponsiveContainer } from "recharts";
+import { ComposedChart, Line, XAxis, YAxis, ReferenceLine, Tooltip, ResponsiveContainer } from "recharts";
 import { Clock } from "lucide-react";
 
-export type ChartPoint = { date: string; close: number; volume?: number };
+export type IntradayPoint = { date: string; time: string; price: number };
 
 const UP_COLOR = "#f87171";
 const DOWN_COLOR = "#60a5fa";
 const FLAT_COLOR = "#94a3b8";
+const MIN_TRADING_DAYS = 5; // 5거래일치가 쌓이기 전까지는 "데이터 수집 중"으로 표시
 
 function fmtPrice(n: number, isUs: boolean) {
   if (isUs) return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -18,136 +19,137 @@ function fmtPrice(n: number, isUs: boolean) {
 function StockChartTooltip({ active, payload, isUs }: any) {
   if (!active || !payload || !payload.length) return null;
   const row = payload[0].payload;
-  const up = row.dayChgPct >= 0;
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-md px-2.5 py-2 text-[11px] shadow-xl">
-      <div className="text-slate-400 mb-1 font-mono">{row.date}</div>
-      <div className="text-slate-100 font-mono text-right">{fmtPrice(row.close, isUs)}</div>
-      {row.dayChgPct != null && (
-        <div className={`font-mono text-right ${up ? "text-red-400" : "text-blue-400"}`}>
-          {up ? "+" : ""}{row.dayChgPct.toFixed(2)}%
-        </div>
-      )}
-      {row.volume != null && row.volume > 0 && (
-        <div className="text-slate-500 font-mono text-right">{row.volume.toLocaleString("ko-KR")}주</div>
-      )}
+      <div className="text-slate-400 mb-1 font-mono">{row.date} {row.time}</div>
+      <div className="text-slate-100 font-mono text-right">{fmtPrice(row.value, isUs)}</div>
     </div>
   );
 }
 
-export function StockChartLoading({ height = 130 }: { height?: number }) {
+export function StockChartLoading({ height = 130, daysCollected = 0 }: { height?: number; daysCollected?: number }) {
   return (
-    <div className="flex items-center justify-center gap-1.5 rounded-md" style={{ height }}>
+    <div className="flex flex-col items-center justify-center gap-1.5 rounded-md" style={{ height }}>
       <Clock size={12} className="text-slate-700 animate-pulse" />
-      <span className="text-[11px] text-slate-600">데이터 수집 중</span>
+      <span className="text-[11px] text-slate-600">
+        데이터 수집 중{daysCollected > 0 ? ` (${daysCollected}/${MIN_TRADING_DAYS}일 확보)` : ""}
+      </span>
     </div>
   );
 }
 
-// 종목별 미니 증권 차트: 주가(상단 ~80%) + 거래량(하단 ~20%), 같은 날짜축 공유.
-// 모든 종목 카드가 이 컴포넌트 하나를 공통으로 재사용합니다.
+// 종목별 미니 증권 차트: 15분(이노스페이스는 5분) 간격으로 실제 수집된 장중 시세를 시간순으로
+// 이어서 그립니다. 가짜로 만든 값이 아니라 실제 체결 시점의 데이터만 사용하며, 5거래일치가
+// 쌓이기 전까지는 로딩 상태로 표시됩니다. 선분 하나하나가 직전 지점 대비 오르면 빨강, 내리면 파랑.
 export default function MiniStockChart({
-  data,
+  points,
   isUs = false,
-  height = 130,
+  prevClose,
+  height = 140,
 }: {
-  data: ChartPoint[];
+  points: IntradayPoint[];
   isUs?: boolean;
+  prevClose?: number | null;
   height?: number;
 }) {
-  const prepared = useMemo(() => {
-    const rows = data.map((d, i) => ({
-      date: d.date,
-      close: d.close,
-      volume: d.volume ?? null,
-      dayChgPct: i > 0 && data[i - 1].close ? ((d.close - data[i - 1].close) / data[i - 1].close) * 100 : null,
-    })) as any[];
+  const sorted = useMemo(
+    () => [...points].sort((a, b) => (a.date + a.time < b.date + b.time ? -1 : 1)),
+    [points]
+  );
 
-    // 요일별 구간 색상: 전일 대비 상승한 날은 빨강, 하락한 날은 파랑 (일간 대시보드 "1주일" 스타일)
+  const distinctDays = useMemo(() => Array.from(new Set(sorted.map((p) => p.date))), [sorted]);
+
+  const { rows, segs, dayTicks, yMin, yMax, priceTicks, refPrice } = useMemo(() => {
+    // 날짜별로 묶어서, 하루 안에서는 실제 수집된 순서 그대로, 날짜 사이에는 x를 정수 단위로
+    // 띄워서(야간 공백을 그대로 그리지 않고) 거래일마다 같은 폭을 갖도록 배치
+    const byDay = new Map<string, IntradayPoint[]>();
+    sorted.forEach((p) => {
+      if (!byDay.has(p.date)) byDay.set(p.date, []);
+      byDay.get(p.date)!.push(p);
+    });
+
+    const flatPoints: { x: number; date: string; time: string; value: number; isDayStart: boolean }[] = [];
+    distinctDays.forEach((date, dayIdx) => {
+      const dayPoints = byDay.get(date)!;
+      dayPoints.forEach((p, j) => {
+        const frac = dayPoints.length > 1 ? j / (dayPoints.length - 1) : 0;
+        flatPoints.push({ x: dayIdx + frac, date: p.date, time: p.time, value: p.price, isDayStart: j === 0 });
+      });
+    });
+
+    const rows: any[] = flatPoints.map((p) => ({ x: p.x, date: p.date, time: p.time, value: p.value }));
     const segs: { key: string; color: string }[] = [];
-    for (let i = 1; i < rows.length; i++) {
+    for (let i = 1; i < flatPoints.length; i++) {
       const key = `seg${i}`;
-      const up = data[i].close >= data[i - 1].close;
-      rows[i - 1][key] = data[i - 1].close;
-      rows[i][key] = data[i].close;
-      segs.push({ key, color: up ? UP_COLOR : DOWN_COLOR });
+      const up = flatPoints[i].value > flatPoints[i - 1].value;
+      const flat = flatPoints[i].value === flatPoints[i - 1].value;
+      rows[i - 1][key] = flatPoints[i - 1].value;
+      rows[i][key] = flatPoints[i].value;
+      segs.push({ key, color: flat ? FLAT_COLOR : up ? UP_COLOR : DOWN_COLOR });
     }
-    return { rows, segs };
-  }, [data]);
 
-  const { yMin, yMax, refPrice, hasVolume, volMax, ticks } = useMemo(() => {
-    const closes = prepared.rows.map((d) => d.close);
-    const max = Math.max(...closes);
-    const min = Math.min(...closes);
-    const pad = (max - min) * 0.08 || Math.max(max * 0.02, 1); // 고가=저가인 경우 대비 최소 범위 확보
+    const dayTicks = flatPoints.filter((p) => p.isDayStart).map((p) => ({ x: p.x, label: p.date.slice(5).replace("-", "/") }));
 
-    const vols = prepared.rows.map((d) => d.volume || 0);
-    const volMax = Math.max(...vols, 0);
+    const values = flatPoints.map((p) => p.value);
+    const max = Math.max(...values, 0);
+    const min = Math.min(...values, max);
+    const pad = (max - min) * 0.08 || Math.max(max * 0.02, 1);
+
+    const refPrice = prevClose != null ? prevClose : flatPoints[0]?.value ?? 0;
 
     return {
-      yMin: min - pad,
-      yMax: max + pad,
-      refPrice: prepared.rows[0]?.close ?? 0, // 우선순위 1: 직전 거래일 종가 = 이 구간 시작 전날 종가가 없으므로 구간 첫 값을 기준으로 사용
-      hasVolume: volMax > 0,
-      volMax,
-      ticks: [min, (min + max) / 2, max],
+      rows, segs, dayTicks,
+      yMin: min - pad, yMax: max + pad,
+      priceTicks: [min, (min + max) / 2, max],
+      refPrice,
     };
-  }, [prepared]);
+  }, [sorted, distinctDays, prevClose]);
 
-  if (!data || data.length < 2) return <StockChartLoading height={height} />;
-
-  const volDomainMax = hasVolume ? volMax / 0.2 : 1;
+  if (distinctDays.length < MIN_TRADING_DAYS) {
+    return <StockChartLoading height={height} daysCollected={distinctDays.length} />;
+  }
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <ComposedChart data={prepared.rows} margin={{ top: 8, right: 4, left: 0, bottom: 4 }}>
+      <ComposedChart data={rows} margin={{ top: 8, right: 4, left: 0, bottom: 4 }}>
+        {/* 거래일 경계: 아주 옅은 세로 구분선 */}
+        {dayTicks.slice(1).map((t) => (
+          <ReferenceLine key={t.x} x={t.x} stroke="#1e293b" strokeWidth={1} />
+        ))}
+
         <XAxis
-          dataKey="date"
+          dataKey="x"
+          type="number"
+          domain={[0, dayTicks.length - 1 + 1]}
+          ticks={dayTicks.map((t) => t.x)}
+          tickFormatter={(v) => dayTicks.find((t) => t.x === v)?.label ?? ""}
           tick={{ fontSize: 10, fill: "#94a3b8" }}
-          tickFormatter={(v) => v.slice(5).replace("-", "/")}
           axisLine={{ stroke: "#1e293b" }}
           tickLine={false}
-          interval="preserveStartEnd"
-          minTickGap={28}
           height={20}
         />
-        {/* 가격 축: 우측, 고가/중간/저가 3개만 */}
         <YAxis
-          yAxisId="price"
           orientation="right"
           domain={[yMin, yMax]}
-          ticks={ticks}
+          ticks={priceTicks}
           tick={{ fontSize: 10, fill: "#94a3b8", textAnchor: "start" }}
           tickFormatter={(v) => fmtPrice(v, isUs)}
           axisLine={false}
           tickLine={false}
           width={44}
         />
-        {/* 거래량 축: 숨김, 값의 범위를 늘려서 차트 하단 20%만 차지하도록 함 */}
-        {hasVolume && (
-          <YAxis yAxisId="vol" domain={[0, volDomainMax]} hide />
-        )}
 
-        <ReferenceLine
-          yAxisId="price"
-          y={refPrice}
-          stroke="#64748b"
-          strokeDasharray="2 3"
-          strokeOpacity={0.7}
-        />
+        <ReferenceLine y={refPrice} stroke="#64748b" strokeDasharray="2 3" strokeOpacity={0.7} />
 
-        {hasVolume && (
-          <Bar yAxisId="vol" dataKey="volume" fill="#64748b" fillOpacity={0.45} radius={[1, 1, 0, 0]} isAnimationActive={false} />
-        )}
-
-        {prepared.segs.map((s) => (
+        {segs.map((s) => (
           <Line
             key={s.key}
-            yAxisId="price"
             type="linear"
             dataKey={s.key}
             stroke={s.color}
-            strokeWidth={1.8}
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
             dot={false}
             connectNulls={false}
             activeDot={{ r: 3, fill: s.color, stroke: "#0f172a", strokeWidth: 1 }}
