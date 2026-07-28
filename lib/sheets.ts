@@ -309,6 +309,77 @@ export async function getUsStockHistory(): Promise<UsStockHistoryRow[]> {
   }));
 }
 
+export type WeeklyChartPoint = {
+  reportDate: string;
+  code: string;
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
+
+export async function getWeeklyChartData(): Promise<WeeklyChartPoint[]> {
+  const url = process.env.WEEKLY_CHART_CSV_URL;
+  if (!url) {
+    console.warn("WEEKLY_CHART_CSV_URL 환경변수가 설정되지 않았습니다.");
+    return [];
+  }
+
+  const text = await fetchCsvText(url);
+  if (text === null) {
+    console.error("종목별 주가 추이 데이터 조회 실패");
+    return [];
+  }
+  const rows = parseCsv(text);
+  const [, ...dataRows] = rows;
+
+  return dataRows.map((r) => ({
+    reportDate: r[0],
+    code: r[1],
+    date: r[2],
+    open: num(r[3]),
+    high: num(r[4]),
+    low: num(r[5]),
+    close: num(r[6]),
+  }));
+}
+
+export type WeeklyIntradayRow = {
+  tradeDate: string;
+  time: string;
+  code: string;
+  name: string;
+  market: string;
+  price: number;
+};
+
+export async function getWeeklyIntradayPrice(): Promise<WeeklyIntradayRow[]> {
+  const url = process.env.WEEKLY_INTRADAY_CSV_URL;
+  if (!url) {
+    console.warn("WEEKLY_INTRADAY_CSV_URL 환경변수가 설정되지 않았습니다.");
+    return [];
+  }
+
+  const text = await fetchCsvText(url);
+  if (text === null) {
+    console.error("주간 장중 시세 조회 실패");
+    return [];
+  }
+  const rows = parseCsv(text);
+  const [, ...dataRows] = rows;
+
+  // 컬럼 순서: 거래일, 측정시각, 종목코드, 기업명, 시장, 현지시간, 한국시간, 주가, 통화, 출처, 수집시각, 간격
+  return dataRows.map((r) => ({
+    tradeDate: r[0],
+    time: r[1],
+    code: r[2],
+    name: r[3],
+    market: r[4],
+    price: num(r[7]),
+  }));
+}
+
 // 가장 최근 report_date 하나만 남기기 (weekly_prices/weekly_news는 매주 계속 누적되므로,
 // 화면에는 최신 리포트 한 주 분량만 보여줌)
 export function latestReportOnly<T extends { reportDate: string }>(rows: T[]): T[] {
