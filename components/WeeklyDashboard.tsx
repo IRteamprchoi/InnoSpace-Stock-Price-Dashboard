@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { TrendingUp, TrendingDown, ExternalLink } from "lucide-react";
-import type { WeeklyPriceRow, WeeklyNewsRow, UsStockHistoryRow } from "@/lib/sheets";
+import type { WeeklyPriceRow, WeeklyNewsRow, WeeklyIntradayRow } from "@/lib/sheets";
 import type { FxRate } from "@/lib/fx";
 import MiniStockChart from "./MiniStockChart";
 import PeerComparisonTable from "./PeerComparisonTable";
@@ -98,12 +98,12 @@ function RetArrow({ v }: { v: number | null }) {
 
 function ChartGrid({
   rows,
-  innospaceHistory,
-  usHistory,
+  innospaceIntraday,
+  peerIntraday,
 }: {
   rows: WeeklyPriceRow[];
-  innospaceHistory: { date: string; close: number; volume: number }[];
-  usHistory: UsStockHistoryRow[];
+  innospaceIntraday: { date: string; time: string; price: number }[];
+  peerIntraday: WeeklyIntradayRow[];
 }) {
   // 지수는 원본 리포트에서도 개별 차트가 없었으므로 제외
   const companies = rows.filter((r) => r.category !== "index");
@@ -113,17 +113,11 @@ function ChartGrid({
       {companies.map((r) => {
         const isInnospace = r.code === "462350";
         const isUs = r.category === "us";
-        let chartData: { date: string; close: number; volume?: number }[] = [];
-
-        if (isInnospace) {
-          chartData = innospaceHistory.slice(-6); // 이번 리포트 기준 최근 1주일(약 5거래일)
-        } else if (isUs) {
-          chartData = usHistory
-            .filter((h) => h.symbol === r.code)
-            .sort((a, b) => (a.date < b.date ? -1 : 1))
-            .slice(-6)
-            .map((h) => ({ date: h.date, close: h.close, volume: h.volume }));
-        }
+        const points = isInnospace
+          ? innospaceIntraday
+          : peerIntraday
+              .filter((p) => p.code === r.code)
+              .map((p) => ({ date: p.tradeDate, time: p.time, price: p.price }));
 
         return (
           <div
@@ -138,7 +132,7 @@ function ChartGrid({
               </span>
               <RetArrow v={r.ret1w} />
             </div>
-            <MiniStockChart data={chartData} isUs={isUs} />
+            <MiniStockChart points={points} isUs={isUs} prevClose={r.prevClose} />
           </div>
         );
       })}
@@ -157,14 +151,14 @@ function orderForComparison(rows: WeeklyPriceRow[]): WeeklyPriceRow[] {
 export default function WeeklyDashboard({
   prices,
   news,
-  innospaceHistory,
-  usHistory,
+  innospaceIntraday,
+  peerIntraday,
   fx,
 }: {
   prices: WeeklyPriceRow[];
   news: WeeklyNewsRow[];
-  innospaceHistory: { date: string; close: number; volume: number }[];
-  usHistory: UsStockHistoryRow[];
+  innospaceIntraday: { date: string; time: string; price: number }[];
+  peerIntraday: WeeklyIntradayRow[];
   fx: FxRate | null;
 }) {
   const orderedRows = useMemo(() => orderForComparison(prices), [prices]);
@@ -209,7 +203,7 @@ export default function WeeklyDashboard({
         이노스페이스·해외 3종목은 실제 추이, 나머지 국내 종목은 데이터가 쌓이는 대로 표시됩니다
       </p>
       <div className="mb-10">
-        <ChartGrid rows={orderedRows} innospaceHistory={innospaceHistory} usHistory={usHistory} />
+        <ChartGrid rows={orderedRows} innospaceIntraday={innospaceIntraday} peerIntraday={peerIntraday} />
       </div>
 
       <div className="flex items-center gap-3 mb-4">
