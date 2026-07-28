@@ -100,10 +100,12 @@ function ChartGrid({
   rows,
   innospaceIntraday,
   peerIntraday,
+  news,
 }: {
   rows: WeeklyPriceRow[];
   innospaceIntraday: { date: string; time: string; price: number }[];
   peerIntraday: WeeklyIntradayRow[];
+  news: WeeklyNewsRow[];
 }) {
   // 지수는 원본 리포트에서도 개별 차트가 없었으므로 제외
   const companies = rows.filter((r) => r.category !== "index");
@@ -118,6 +120,7 @@ function ChartGrid({
           : peerIntraday
               .filter((p) => p.code === r.code)
               .map((p) => ({ date: p.tradeDate, time: p.time, price: p.price }));
+        const companyNews = news.filter((n) => n.name === r.name);
 
         return (
           <div
@@ -133,6 +136,29 @@ function ChartGrid({
               <RetArrow v={r.ret1w} />
             </div>
             <MiniStockChart points={points} isUs={isUs} prevClose={r.prevClose} />
+
+            {companyNews.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-slate-800">
+                <div className="text-[11px] font-semibold text-slate-500 mb-1.5">최신뉴스</div>
+                <div className="flex flex-col gap-1.5">
+                  {companyNews.map((n, i) => (
+                    <a
+                      key={i}
+                      href={n.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-start gap-1.5 text-[12px] text-slate-300 hover:text-amber-300 transition-colors"
+                    >
+                      <ExternalLink size={11} className="mt-0.5 shrink-0 opacity-50 group-hover:opacity-100" />
+                      <span className="leading-snug line-clamp-2">
+                        {n.title}
+                        <span className="text-slate-500 font-normal"> · {n.source}</span>
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         );
       })}
@@ -197,20 +223,14 @@ export default function WeeklyDashboard({
 
       <div className="flex items-center gap-3 mb-1">
         <span className="w-1 h-4 bg-amber-400 rounded-sm shrink-0" />
-        <h2 className="section-title">종목별 주가 추이</h2>
+        <h2 className="section-title">종목별 주가 추이 및 최신뉴스</h2>
       </div>
       <p className="text-[12px] text-slate-500 mb-4 pl-3">
         이노스페이스·해외 3종목은 실제 추이, 나머지 국내 종목은 데이터가 쌓이는 대로 표시됩니다
       </p>
-      <div className="mb-10">
-        <ChartGrid rows={orderedRows} innospaceIntraday={innospaceIntraday} peerIntraday={peerIntraday} />
+      <div>
+        <ChartGrid rows={orderedRows} innospaceIntraday={innospaceIntraday} peerIntraday={peerIntraday} news={news} />
       </div>
-
-      <div className="flex items-center gap-3 mb-4">
-        <span className="w-1 h-4 bg-amber-400 rounded-sm shrink-0" />
-        <h2 className="section-title">주요 관련 기사</h2>
-      </div>
-      <NewsSection news={news} />
     </div>
   );
 }
