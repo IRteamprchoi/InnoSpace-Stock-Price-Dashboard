@@ -226,21 +226,35 @@ export default function WeeklyDashboard({
             <span className="font-semibold">기준기간</span> {periodLabel(weekStart)} ~ {periodLabel(refFriday)}
           </p>
           <div className="grid grid-cols-2 gap-3">
-            {indices.map((idx) => (
-              <div key={idx.code} className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3.5 sm:px-5 flex flex-col justify-center gap-1.5">
-                <div className="metric-label">{idx.name}</div>
-                <div className="flex items-baseline gap-2.5 flex-wrap">
-                  <span className="metric-value-primary text-slate-100">{idx.close?.toLocaleString("ko-KR")}</span>
-                  <span className="inline-flex items-center gap-1 text-[13px]">
-                    <span className="text-slate-500 font-medium">주간</span>
+            {indices.map((idx) => {
+              const chgPt = idx.close != null && idx.prevClose != null ? idx.close - idx.prevClose : null;
+              return (
+                <div key={idx.code} className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3.5 sm:px-5 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="metric-label">{idx.name}</div>
                     <PctCell v={idx.ret1w} />
-                  </span>
+                  </div>
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="metric-value-primary text-slate-100">{idx.close?.toLocaleString("ko-KR")}</span>
+                    {chgPt != null && (
+                      <span className={`text-[12px] font-medium tabular-nums ${chgPt >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                        {chgPt >= 0 ? "+" : ""}{chgPt.toFixed(2)}pt
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[12px] text-slate-500 font-medium tabular-nums">
+                    주초 {idx.prevClose?.toLocaleString("ko-KR")} → 주말 {idx.close?.toLocaleString("ko-KR")}
+                  </div>
+                  <div className="flex items-center justify-between text-[12px] font-medium tabular-nums pt-1.5 border-t border-slate-800">
+                    <span className="text-slate-500">주간 최고 <span className="text-slate-300">{idx.weekHigh?.toLocaleString("ko-KR")}</span> · 최저 <span className="text-slate-300">{idx.weekLow?.toLocaleString("ko-KR")}</span></span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[12px] font-medium">
+                    <span className="text-slate-500">YTD</span>
+                    <PctCell v={idx.retYtd} />
+                  </div>
                 </div>
-                <div className="text-[12px] text-slate-500 font-medium tabular-nums">
-                  주간 최고 {idx.weekHigh?.toLocaleString("ko-KR")} · 최저 {idx.weekLow?.toLocaleString("ko-KR")}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
