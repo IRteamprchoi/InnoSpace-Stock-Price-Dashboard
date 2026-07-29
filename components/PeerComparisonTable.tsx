@@ -192,10 +192,18 @@ export default function PeerComparisonTable({
         <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 flex flex-col justify-center gap-1.5">
           <div className="metric-label">이노스페이스 주간 등락률</div>
           <RetPct v={innospace?.ret1w ?? null} size="lg" />
+          {innospace?.ret1w != null && peerSummaryStat != null && (
+            <div className="text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
+              피어그룹 평균 대비 {(innospace.ret1w - peerSummaryStat >= 0 ? "+" : "")}{(innospace.ret1w - peerSummaryStat).toFixed(2)}%p
+            </div>
+          )}
         </div>
         <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 flex flex-col justify-center gap-1.5">
           <div className="metric-label">{peerSummaryLabel}</div>
           <RetPct v={peerSummaryStat} size="lg" />
+          <div className="text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
+            국내 {domesticPeers.length}개사 · 해외 {usPeers.length}개사 기준
+          </div>
         </div>
         <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 flex flex-col justify-center gap-1.5">
           <div className="metric-label">피어그룹 내 주간 등락률 순위</div>
@@ -310,14 +318,14 @@ export default function PeerComparisonTable({
                     {isOpen && (
                       <tr className="bg-slate-950/40 border-b border-slate-800/50">
                         <td colSpan={9} className="px-6 py-3">
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-[12px]">
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-6 gap-y-2 text-[12px]">
                             <div className="sm:hidden"><span className="text-slate-500">구분 </span><span className="text-slate-300">{isOwn ? "당사" : isUs ? "해외" : "국내"}</span></div>
                             <div className="sm:hidden"><span className="text-slate-500">{startLabel} 종가 </span><span className="text-slate-300 tabular-nums">{fmtPriceText(r.prevClose, isUs)}</span></div>
                             <div><span className="text-slate-500">주간 최고 </span><span className="text-slate-300 tabular-nums">{fmtPriceText(r.weekHigh, isUs)}</span></div>
                             <div><span className="text-slate-500">주간 최저 </span><span className="text-slate-300 tabular-nums">{fmtPriceText(r.weekLow, isUs)}</span></div>
-                            <div className="sm:hidden"><span className="text-slate-500">1개월 수익률 </span><RetPct v={r.ret1m} /></div>
-                            <div><span className="text-slate-500">3개월 수익률 </span><RetPct v={r.ret3m} /></div>
-                            <div><span className="text-slate-500">종목코드 </span><span className="text-slate-300 font-mono">{r.code}</span></div>
+                            <div><span className="text-slate-500">1개월 </span><RetPct v={r.ret1m} /></div>
+                            <div><span className="text-slate-500">3개월 </span><RetPct v={r.ret3m} /></div>
+                            <div><span className="text-slate-500">YTD </span><RetPct v={r.retYtd} /></div>
                           </div>
                         </td>
                       </tr>
