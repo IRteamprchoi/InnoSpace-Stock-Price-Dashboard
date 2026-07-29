@@ -160,9 +160,15 @@ export default function DailyDashboard({ dailyData, intradayData }: { dailyData:
   const prevClose = sorted.length > 1 ? sorted[sorted.length - 2].close : latest?.close;
   const marketOpen = isMarketOpenNow();
 
-  // 장중 참고 시세: intraday_price 시트의 가장 최근 값, 없으면 일별 확정 데이터로 대체
+  // 장중 참고 시세: intraday_price 시트의 가장 최근 값 사용.
+  // 다만 장마감 후이고 오늘자 확정 데이터(daily_data)가 이미 들어와 있다면, 마감 직전 스냅샷 대신
+  // 그 확정 종가를 그대로 써서 "일별 주가 및 거래 현황"과 숫자가 어긋나지 않도록 함.
   const latestIntraday = intradayData.length ? intradayData[intradayData.length - 1] : null;
-  const live = latestIntraday
+  const todayKST = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+  const todayConfirmed = !marketOpen && latest && latest.d === todayKST;
+  const live = todayConfirmed
+    ? { close: latest.close, chg: latest.chg, chgPct: latest.chgPct, open: latest.open, high: latest.high, low: latest.low, vol: latest.vol, amt: latest.amt, mcap: latest.mcap }
+    : latestIntraday
     ? {
         close: latestIntraday.price, chg: latestIntraday.chg, chgPct: latestIntraday.chgPct,
         open: latestIntraday.open, high: latestIntraday.high, low: latestIntraday.low,
