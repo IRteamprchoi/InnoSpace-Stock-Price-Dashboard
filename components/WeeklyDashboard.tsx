@@ -222,17 +222,19 @@ export default function WeeklyDashboard({
             <span className="w-1 h-4 bg-amber-400 rounded-sm shrink-0" />
             <h2 className="section-title">시장지수 주간 동향</h2>
           </div>
-          <p className="text-[13px] text-slate-500 pl-3 mb-3">
-            기준기간: {periodLabel(weekStart)} ~ {periodLabel(refFriday)}
+          <p className="text-[13px] sm:text-[14px] font-medium mb-3" style={{ color: "#9FB0C7" }}>
+            <span className="font-semibold">기준기간</span> {periodLabel(weekStart)} ~ {periodLabel(refFriday)}
           </p>
           <div className="grid grid-cols-2 gap-3">
             {indices.map((idx) => (
-              <div key={idx.code} className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3">
-                <div className="metric-label mb-1">{idx.name}</div>
-                <div className="metric-value-primary text-slate-100 mb-1.5">{idx.close?.toLocaleString("ko-KR")}</div>
-                <div className="flex items-center gap-1.5 text-[13px]">
-                  <span className="text-slate-500 font-medium">주간 등락률</span>
-                  <PctCell v={idx.ret1w} />
+              <div key={idx.code} className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3.5 sm:px-5 flex flex-col justify-center gap-1">
+                <div className="metric-label">{idx.name}</div>
+                <div className="flex items-baseline gap-2.5 flex-wrap">
+                  <span className="metric-value-primary text-slate-100">{idx.close?.toLocaleString("ko-KR")}</span>
+                  <span className="inline-flex items-center gap-1 text-[13px]">
+                    <span className="text-slate-500 font-medium">주간</span>
+                    <PctCell v={idx.ret1w} />
+                  </span>
                 </div>
               </div>
             ))}
