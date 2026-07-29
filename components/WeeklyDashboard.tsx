@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { TrendingUp, TrendingDown, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import type { WeeklyPriceRow, WeeklyNewsRow, WeeklyIntradayRow } from "@/lib/sheets";
 import type { FxRate } from "@/lib/fx";
 import MiniStockChart from "./MiniStockChart";
@@ -26,11 +26,11 @@ function PctCell({ v }: { v: number | null }) {
   if (v == null) return <span className="text-slate-600">-</span>;
   const up = v > 0;
   const flat = v === 0;
-  const color = flat ? "text-slate-300" : up ? "text-red-400" : "text-blue-400";
+  const color = flat ? "text-slate-400" : up ? "text-red-400" : "text-blue-400";
+  const arrow = flat ? "―" : up ? "▲" : "▼";
   return (
-    <span className={`inline-flex items-center gap-0.5 font-semibold tabular-nums ${color}`}>
-      {!flat && (up ? <TrendingUp size={12} /> : <TrendingDown size={12} />)}
-      {up ? "+" : ""}{v.toFixed(2)}%
+    <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${color}`}>
+      <span>{arrow}</span>{Math.abs(v).toFixed(2)}%
     </span>
   );
 }
@@ -200,20 +200,43 @@ export default function WeeklyDashboard({
     );
   }
 
+  const refFriday = prices[0]?.refFriday || "";
+  const weekStartRaw = refFriday ? new Date(refFriday + "T00:00:00+09:00") : null;
+  if (weekStartRaw) weekStartRaw.setDate(weekStartRaw.getDate() - 4);
+  const weekStart = weekStartRaw
+    ? `${weekStartRaw.getFullYear()}-${String(weekStartRaw.getMonth() + 1).padStart(2, "0")}-${String(weekStartRaw.getDate()).padStart(2, "0")}`
+    : "";
+  const periodLabel = (d: string) => {
+    if (!d) return "-";
+    const [y, m, day] = d.split("-");
+    const wd = ["일", "월", "화", "수", "목", "금", "토"][new Date(d + "T00:00:00+09:00").getDay()];
+    return `${y}.${m}.${day}(${wd})`;
+  };
+
   return (
     <div>
-      {/* 시장 지수 (참고용, 간단히) */}
+      {/* 시장 지수 주간 동향 */}
       {indices.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          {indices.map((idx) => (
-            <div key={idx.code} className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3 flex items-center justify-between">
-              <span className="metric-label">{idx.name}</span>
-              <div className="flex items-center gap-2">
-                <span className="metric-value text-slate-100">{idx.close?.toLocaleString("ko-KR")}</span>
-                <PctCell v={idx.ret1w} />
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-1">
+            <span className="w-1 h-4 bg-amber-400 rounded-sm shrink-0" />
+            <h2 className="section-title">시장지수 주간 동향</h2>
+          </div>
+          <p className="text-[13px] text-slate-500 pl-3 mb-3">
+            기준기간: {periodLabel(weekStart)} ~ {periodLabel(refFriday)}
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {indices.map((idx) => (
+              <div key={idx.code} className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3">
+                <div className="metric-label mb-1">{idx.name}</div>
+                <div className="metric-value-primary text-slate-100 mb-1.5">{idx.close?.toLocaleString("ko-KR")}</div>
+                <div className="flex items-center gap-1.5 text-[13px]">
+                  <span className="text-slate-500 font-medium">주간 등락률</span>
+                  <PctCell v={idx.ret1w} />
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
