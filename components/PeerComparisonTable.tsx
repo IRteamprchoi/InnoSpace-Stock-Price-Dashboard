@@ -212,39 +212,42 @@ export default function PeerComparisonTable({
 
       {/* 상단 요약 카드 3개 */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 flex flex-col gap-1.5">
-          <div className="metric-label">이노스페이스 주간 등락률</div>
-          <RetPct v={innospace?.ret1w ?? null} size="lg" />
-          <div className="flex flex-col gap-0.5 text-[11px] sm:text-[12px] font-medium pt-1 border-t border-slate-800" style={{ color: "#8495AD" }}>
-            {innospace?.ret1w != null && peerSummaryStat != null && (
-              <span>피어그룹 평균 대비 {(innospace.ret1w - peerSummaryStat >= 0 ? "+" : "")}{(innospace.ret1w - peerSummaryStat).toFixed(2)}%p</span>
-            )}
-            <span className="flex items-center gap-3">
+        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5">
+          <div className="metric-label mb-1.5">이노스페이스 주간 등락률</div>
+          <div className="grid grid-cols-2 gap-3">
+            <RetPct v={innospace?.ret1w ?? null} size="lg" />
+            <div className="flex flex-col justify-center gap-1 pl-3 border-l border-slate-800 text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
+              {innospace?.ret1w != null && peerSummaryStat != null && (
+                <span>평균 대비 {(innospace.ret1w - peerSummaryStat >= 0 ? "+" : "")}{(innospace.ret1w - peerSummaryStat).toFixed(2)}%p</span>
+              )}
               {rankInfo && <span>{rankInfo.total}개사 중 {rankInfo.rank}위</span>}
               {innospace?.ret1m != null && (
                 <span className="inline-flex items-center gap-1">1개월 <RetPct v={innospace.ret1m} /></span>
               )}
-            </span>
+            </div>
           </div>
         </div>
-        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 flex flex-col gap-1.5">
-          <div className="metric-label">{peerSummaryLabel}</div>
-          <RetPct v={peerSummaryStat} size="lg" />
-          <div className="flex flex-col gap-0.5 text-[11px] sm:text-[12px] font-medium pt-1 border-t border-slate-800" style={{ color: "#8495AD" }}>
-            <span className="flex items-center gap-3 flex-wrap">
+        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5">
+          <div className="metric-label mb-1.5">{peerSummaryLabel}</div>
+          <div className="grid grid-cols-2 gap-3">
+            <RetPct v={peerSummaryStat} size="lg" />
+            <div className="flex flex-col justify-center gap-1 pl-3 border-l border-slate-800 text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
               <span className="inline-flex items-center gap-1">해외 평균 <RetPct v={usAvg} /></span>
               <span className="inline-flex items-center gap-1">국내 평균 <RetPct v={domesticAvg} /></span>
-            </span>
-            <span>상승 <span className="text-red-400 font-semibold">{upCount}개사</span> · 하락 <span className="text-blue-400 font-semibold">{downCount}개사</span></span>
+              <span>상승 <span className="text-red-400 font-semibold">{upCount}</span> · 하락 <span className="text-blue-400 font-semibold">{downCount}개사</span></span>
+            </div>
           </div>
         </div>
-        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 flex flex-col justify-center gap-1.5">
-          <div className="metric-label">피어그룹 내 주간 등락률 순위</div>
-          <span className="metric-value-primary text-slate-100 tabular-nums">
-            {rankInfo ? `${rankInfo.rank}위 / ${rankInfo.total}개사` : "-"}
-          </span>
-          <div className="text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
-            주간 등락률 내림차순 · 당사 포함 {rankInfo?.total ?? ""}개사 기준
+        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5">
+          <div className="metric-label mb-1.5">피어그룹 내 주간 등락률 순위</div>
+          <div className="grid grid-cols-2 gap-3">
+            <span className="metric-value-primary text-slate-100 tabular-nums">
+              {rankInfo ? `${rankInfo.rank}위 / ${rankInfo.total}개사` : "-"}
+            </span>
+            <div className="flex flex-col justify-center gap-1 pl-3 border-l border-slate-800 text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
+              <span>주간 등락률 내림차순</span>
+              <span>당사 포함 {rankInfo?.total ?? ""}개사 기준</span>
+            </div>
           </div>
         </div>
       </div>
