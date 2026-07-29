@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, Info } from "lucide-react";
 import type { WeeklyPriceRow } from "@/lib/sheets";
 import type { FxRate } from "@/lib/fx";
 
@@ -9,6 +9,7 @@ import type { FxRate } from "@/lib/fx";
 const SUMMARY_STAT: "avg" | "median" = "avg";
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
+const PERIOD_COLOR = "#9FB0C7";
 
 function dotDate(dateStr?: string) {
   if (!dateStr) return "-";
@@ -67,15 +68,15 @@ function fmtLocalCap(n: number | null, isUs: boolean) {
   return "$" + (n / 1e6).toLocaleString("ko-KR", { maximumFractionDigits: 0 }) + "M";
 }
 
-function RetPct({ v, size = "base" }: { v: number | null; size?: "base" | "lg" }) {
+function RetPct({ v, size = "base" }: { v: number | null; size?: "base" | "sm" | "lg" }) {
   if (v == null) return <span className="text-slate-600">-</span>;
   const up = v > 0;
   const flat = v === 0;
   const color = flat ? "text-slate-400" : up ? "text-red-400" : "text-blue-400";
   const arrow = flat ? "―" : up ? "▲" : "▼";
-  const sizeClass = size === "lg" ? "text-[15px] sm:text-[16px]" : "text-[13px]";
+  const sizeClass = size === "lg" ? "text-[15px] sm:text-[16px] font-bold" : size === "sm" ? "text-[12.5px] font-semibold" : "text-[13px] font-bold";
   return (
-    <span className={`inline-flex items-center gap-1 font-bold tabular-nums ${sizeClass} ${color}`}>
+    <span className={`inline-flex items-center gap-1 tabular-nums ${sizeClass} ${color}`}>
       <span>{arrow}</span>
       {Math.abs(v).toFixed(2)}%
     </span>
@@ -104,6 +105,17 @@ function Badge({ label, tone }: { label: string; tone: "own" | "domestic" | "us"
     </span>
   );
 }
+
+// 데스크톱 권장 열 너비
+const COL_W = {
+  badge: "70px",
+  name: "200px",
+  price: "120px",
+  ret: "115px",
+  mid: "105px",
+  cap: "135px",
+  chevron: "40px",
+};
 
 export default function PeerComparisonTable({
   rows,
@@ -167,56 +179,69 @@ export default function PeerComparisonTable({
           <span className="w-1 h-4 bg-amber-400 rounded-sm shrink-0" />
           <h2 className="section-title">이노스페이스 및 피어그룹 주간 주가 동향</h2>
         </div>
-        <p className="text-[13px] text-slate-500 pl-3">
-          주간 종가 변동 및 시가총액 비교 · 기준기간: {dotDateWeekday(weekStart)} ~ {dotDateWeekday(refFriday)}
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-0.5 sm:gap-3">
+          <p className="text-[13px] text-slate-500">주간 종가 변동 및 시가총액 비교</p>
+          <p className="text-[13px] sm:text-[14px] font-medium" style={{ color: PERIOD_COLOR }}>
+            <span className="font-semibold">기준기간</span> {dotDateWeekday(weekStart)} ~ {dotDateWeekday(refFriday)}
+          </p>
+        </div>
       </div>
 
       {/* 상단 요약 카드 3개 */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3">
-          <div className="metric-label mb-1">이노스페이스 주간 등락률</div>
+        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 flex flex-col justify-center gap-1.5">
+          <div className="metric-label">이노스페이스 주간 등락률</div>
           <RetPct v={innospace?.ret1w ?? null} size="lg" />
         </div>
-        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3">
-          <div className="metric-label mb-1">{peerSummaryLabel}</div>
+        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 flex flex-col justify-center gap-1.5">
+          <div className="metric-label">{peerSummaryLabel}</div>
           <RetPct v={peerSummaryStat} size="lg" />
         </div>
-        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3">
-          <div className="metric-label mb-1">피어그룹 내 주간 등락률 순위</div>
+        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 flex flex-col justify-center gap-1.5">
+          <div className="metric-label">피어그룹 내 주간 등락률 순위</div>
           <span className="metric-value-primary text-slate-100 tabular-nums">
             {rankInfo ? `${rankInfo.rank}위 / ${rankInfo.total}개사` : "-"}
           </span>
-          <div className="text-[11px] text-slate-500 mt-1">주간 등락률 내림차순 · 당사 포함 전체 비교대상 기준</div>
+          <div className="text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
+            주간 등락률 내림차순 · 당사 포함 {rankInfo?.total ?? ""}개사 기준
+          </div>
         </div>
       </div>
 
-      <p className="text-[12px] text-slate-500 mb-2 pl-1 flex items-center gap-1">
-        <ChevronRight size={12} className="text-slate-600" />
-        기업명을 클릭하면 주간 최고·최저 및 기간별 수익률을 확인할 수 있습니다.
-      </p>
+      {/* 클릭 안내 바 */}
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 mb-2">
+        <Info size={13} style={{ color: PERIOD_COLOR }} />
+        <span className="text-[13px] font-medium" style={{ color: PERIOD_COLOR }}>
+          각 기업 행을 클릭하면 주간 최고·최저 및 기간별 수익률을 확인할 수 있습니다.
+        </span>
+      </div>
 
       {/* 비교 표 */}
       <div className="bg-slate-900/70 border border-slate-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-            <thead>
-              {/* 그룹 헤더 (2단) */}
-              <tr className="bg-slate-800/50 text-slate-500 text-[11px]">
-                <th colSpan={2} className="text-center font-semibold py-1.5 border-b border-slate-700/60">기업 정보</th>
-                <th colSpan={2} className="hidden sm:table-cell text-center font-semibold py-1.5 border-b border-slate-700/60">주가 현황</th>
-                <th className="text-center font-semibold py-1.5 border-b border-slate-700/60">주간 등락률</th>
-                <th className="text-center font-semibold py-1.5 border-b border-slate-700/60">기업 규모</th>
-                <th className="hidden sm:table-cell border-b border-slate-700/60" />
-              </tr>
+            <colgroup>
+              <col style={{ width: COL_W.badge }} />
+              <col style={{ width: COL_W.name }} />
+              <col style={{ width: COL_W.price }} />
+              <col style={{ width: COL_W.price }} />
+              <col style={{ width: COL_W.ret }} />
+              <col style={{ width: COL_W.mid }} />
+              <col style={{ width: COL_W.mid }} />
+              <col style={{ width: COL_W.cap }} />
+              <col style={{ width: COL_W.chevron }} />
+            </colgroup>
+            <thead className="sticky top-0 z-20 bg-slate-900">
               <tr className="text-slate-400 text-[12px] border-b border-slate-700">
-                <th className="text-center font-semibold px-2 py-2.5 w-[48px]">구분</th>
+                <th className="text-center font-semibold px-2 py-2.5">구분</th>
                 <th className="text-left font-semibold pl-3 pr-2 py-2.5">기업명</th>
-                <th className="hidden sm:table-cell text-right font-semibold px-2 py-2.5 w-[92px] whitespace-nowrap">{startLabel} 종가</th>
-                <th className="hidden sm:table-cell text-right font-semibold px-2 py-2.5 w-[92px] whitespace-nowrap">{endLabel} 종가</th>
-                <th className="text-right font-semibold px-3 py-2.5 w-[110px]">주간 등락률</th>
-                <th className="text-right font-semibold px-3 py-2.5 w-[130px]">시가총액</th>
-                <th className="hidden sm:table-cell w-[32px]" />
+                <th className="hidden sm:table-cell text-right font-semibold px-2 py-2.5 whitespace-nowrap">{startLabel} 종가</th>
+                <th className="text-right font-semibold px-2 py-2.5 whitespace-nowrap">{endLabel} 종가</th>
+                <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">주간 등락률</th>
+                <th className="hidden sm:table-cell text-right font-semibold px-2 py-2.5 whitespace-nowrap">1개월 수익률</th>
+                <th className="text-right font-semibold px-2 py-2.5 whitespace-nowrap">YTD 수익률</th>
+                <th className="text-right font-semibold px-3 py-2.5 whitespace-nowrap">시가총액</th>
+                <th className="w-[40px]" />
               </tr>
             </thead>
             <tbody>
@@ -232,60 +257,67 @@ export default function PeerComparisonTable({
                   <React.Fragment key={r.code}>
                     {isFirstUs && (
                       <tr>
-                        <td colSpan={7} className="px-3 pt-3 pb-1 text-[11px] font-semibold text-slate-500 border-b border-slate-800/60">
+                        <td colSpan={9} className="px-3 py-1.5 text-[12px] font-semibold text-slate-400 bg-slate-800/40 border-b border-slate-800/60" style={{ height: 32 }}>
                           해외 피어그룹
                         </td>
                       </tr>
                     )}
                     {isFirstDomestic && (
                       <tr>
-                        <td colSpan={7} className="px-3 pt-3 pb-1 text-[11px] font-semibold text-slate-500 border-b border-slate-800/60">
+                        <td colSpan={9} className="px-3 py-1.5 text-[12px] font-semibold text-slate-400 bg-slate-800/40 border-b border-slate-800/60" style={{ height: 32 }}>
                           국내 피어그룹
                         </td>
                       </tr>
                     )}
                     <tr
                       className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors cursor-pointer"
-                      style={{ height: 52 }}
+                      style={{ height: 54 }}
                       onClick={() => setExpanded(isOpen ? null : r.code)}
                     >
                       <td className="px-2 py-2 text-center">
                         <Badge label={isOwn ? "당사" : isUs ? "해외" : "국내"} tone={isOwn ? "own" : isUs ? "us" : "domestic"} />
                       </td>
-                      <td className="pl-3 pr-2 py-2 text-left whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1.5 ${isOwn ? "font-bold text-slate-50" : "font-semibold text-slate-100"}`}>
+                      <td className="pl-3 pr-2 py-2 text-left" title={r.name}>
+                        <span className={`inline-flex items-center gap-1.5 max-w-full ${isOwn ? "font-bold text-slate-50" : "font-semibold text-slate-100"}`}>
                           {isOwn && <span className="w-0.5 h-3.5 bg-amber-400 rounded-sm shrink-0" />}
-                          {r.name}
+                          <span className="truncate">{r.name}</span>
                         </span>
                       </td>
                       <td className="hidden sm:table-cell px-2 py-2 text-right text-slate-400">
                         <PriceValue n={r.prevClose} isUs={isUs} />
                       </td>
-                      <td className="hidden sm:table-cell px-2 py-2 text-right text-slate-100">
+                      <td className="px-2 py-2 text-right text-slate-100">
                         <PriceValue n={r.close} isUs={isUs} />
                       </td>
                       <td className="px-3 py-2 text-right">
                         <RetPct v={r.ret1w} size="lg" />
                         <MiniBar v={r.ret1w} maxAbs={maxAbsRet} />
                       </td>
+                      <td className="hidden sm:table-cell px-2 py-2 text-right">
+                        <RetPct v={r.ret1m} size="sm" />
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        <RetPct v={r.retYtd} size="sm" />
+                      </td>
                       <td className="px-3 py-2 text-right">
                         <div className="font-semibold text-slate-100 tabular-nums text-[13px]">{fmtMarketCapKrw(krwMarketCap(r))}</div>
                         {localCap && <div className="text-[11px] text-slate-500 mt-0.5">{localCap}</div>}
                       </td>
-                      <td className="hidden sm:table-cell px-2 text-center">
-                        <ChevronDown size={14} className={`text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                      <td className="px-2 text-center">
+                        <ChevronDown size={15} className={`text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                       </td>
                     </tr>
                     {isOpen && (
                       <tr className="bg-slate-950/40 border-b border-slate-800/50">
-                        <td colSpan={7} className="px-6 py-3">
+                        <td colSpan={9} className="px-6 py-3">
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-[12px]">
+                            <div className="sm:hidden"><span className="text-slate-500">구분 </span><span className="text-slate-300">{isOwn ? "당사" : isUs ? "해외" : "국내"}</span></div>
+                            <div className="sm:hidden"><span className="text-slate-500">{startLabel} 종가 </span><span className="text-slate-300 tabular-nums">{fmtPriceText(r.prevClose, isUs)}</span></div>
                             <div><span className="text-slate-500">주간 최고 </span><span className="text-slate-300 tabular-nums">{fmtPriceText(r.weekHigh, isUs)}</span></div>
                             <div><span className="text-slate-500">주간 최저 </span><span className="text-slate-300 tabular-nums">{fmtPriceText(r.weekLow, isUs)}</span></div>
-                            <div><span className="text-slate-500">종목코드 </span><span className="text-slate-300 font-mono">{r.code}</span></div>
-                            <div><span className="text-slate-500">1개월 수익률 </span><RetPct v={r.ret1m} /></div>
+                            <div className="sm:hidden"><span className="text-slate-500">1개월 수익률 </span><RetPct v={r.ret1m} /></div>
                             <div><span className="text-slate-500">3개월 수익률 </span><RetPct v={r.ret3m} /></div>
-                            <div><span className="text-slate-500">YTD 수익률 </span><RetPct v={r.retYtd} /></div>
+                            <div><span className="text-slate-500">종목코드 </span><span className="text-slate-300 font-mono">{r.code}</span></div>
                           </div>
                         </td>
                       </tr>
