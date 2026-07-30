@@ -158,9 +158,9 @@ function ChartGrid({
             </div>
             <MiniStockChart points={points} isUs={isUs} prevClose={r.prevClose} />
 
-            {companyNews.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-slate-800">
-                <div className="text-[11px] font-semibold text-slate-500 mb-1.5">최신뉴스</div>
+            <div className="mt-3 pt-3 border-t border-slate-800">
+              <div className="text-[11px] font-semibold text-slate-500 mb-1.5">최신뉴스</div>
+              {companyNews.length > 0 ? (
                 <div className="flex flex-col gap-1.5">
                   {companyNews.map((n, i) => (
                     <a
@@ -178,8 +178,10 @@ function ChartGrid({
                     </a>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-[12px] text-slate-600">이번 주 발간된 관련 뉴스가 없습니다.</p>
+              )}
+            </div>
           </div>
         );
       })}
@@ -330,13 +332,10 @@ export default function WeeklyDashboard({
         <PeerComparisonTable rows={orderedRows} weekChartData={weekChartData} fx={fx} />
       </div>
 
-      <div className="flex items-center gap-3 mb-1">
+      <div className="flex items-center gap-3 mb-4">
         <span className="w-1 h-4 bg-amber-400 rounded-sm shrink-0" />
         <h2 className="section-title">종목별 주가 추이 및 최신뉴스</h2>
       </div>
-      <p className="text-[12px] text-slate-500 mb-4 pl-3">
-        이노스페이스·해외 3종목은 실제 추이, 나머지 국내 종목은 데이터가 쌓이는 대로 표시됩니다
-      </p>
       <div>
         <ChartGrid rows={orderedRows} innospaceIntraday={innospaceIntraday} peerIntraday={peerIntraday} news={news} />
       </div>
