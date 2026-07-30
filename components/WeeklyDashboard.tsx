@@ -236,11 +236,16 @@ export default function WeeklyDashboard({
                   <div className="flex items-start justify-between gap-2">
                     <div className="text-[15px] sm:text-[16px] font-bold text-slate-200">{idx.name}</div>
                     {rangePt != null && (
-                      <div className="text-right shrink-0">
-                        <div className="text-[11px] text-slate-500 font-medium">주간 변동폭</div>
-                        <div className="text-[12.5px] font-bold text-slate-300 tabular-nums">
-                          {rangePt.toFixed(2)}pt{rangePct != null && <span className="text-slate-500 font-medium"> · {rangePct.toFixed(2)}%</span>}
+                      <div className="text-right shrink-0 flex flex-col items-end justify-center">
+                        <div className="text-[13px] sm:text-[14px] font-semibold text-slate-400">주간 고저폭</div>
+                        <div className="text-[17px] sm:text-[19px] font-bold text-slate-100 tabular-nums leading-tight">
+                          {rangePt.toFixed(2)}pt
                         </div>
+                        {rangePct != null && (
+                          <div className="text-[13px] sm:text-[14px] font-semibold text-slate-400 tabular-nums">
+                            최저 대비 {rangePct.toFixed(2)}%
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
