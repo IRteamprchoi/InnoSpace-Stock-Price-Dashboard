@@ -254,57 +254,66 @@ export default function WeeklyDashboard({
               const rangePt = idx.weekHigh != null && idx.weekLow != null ? idx.weekHigh - idx.weekLow : null;
               const rangePct = rangePt != null && idx.weekLow ? (rangePt / idx.weekLow) * 100 : null;
               return (
-                <div key={idx.code} className="bg-slate-900/70 border border-slate-700 rounded-lg" style={{ height: "auto", minHeight: 0, padding: "15px 18px" }}>
-                  {/* 1~2행: 왼쪽 지수명+값, 오른쪽 주간고저폭 */}
-                  <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: "20px" }}>
-                    <div className="flex flex-col min-w-0" style={{ gap: "5px" }}>
-                      <div className="text-[15px] sm:text-[16px] font-bold text-slate-200">{idx.name}</div>
-                      <div className="flex items-baseline flex-wrap" style={{ gap: "10px" }}>
-                        <span className="metric-value-primary text-slate-100">{idx.close?.toLocaleString("ko-KR")}</span>
-                        <PctCell v={idx.ret1w} size="lg" />
-                        {chgPt != null && (
-                          <span className={`text-[12px] font-medium tabular-nums ${chgPt >= 0 ? "text-red-400" : "text-blue-400"}`}>
-                            {chgPt >= 0 ? "+" : ""}{chgPt.toFixed(2)}pt
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {rangePt != null && (
-                      <div className="text-right shrink-0">
-                        <div className="text-[13px] sm:text-[14px] font-semibold text-slate-400">주간 고저폭</div>
-                        <div className="text-[17px] sm:text-[19px] font-bold text-slate-100 tabular-nums leading-tight">
-                          {rangePt.toFixed(2)}pt
+                <div key={idx.code} className="bg-slate-900/70 border border-slate-700 rounded-lg" style={{ height: "auto", minHeight: 0, padding: "14px 18px" }}>
+                  <div className="flex flex-col" style={{ gap: "8px" }}>
+                    {/* 상단: 왼쪽 지수명+값, 오른쪽 주간고저폭 - 제목과 수치가 바로 붙도록 gap 최소화 */}
+                    <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: "20px" }}>
+                      <div className="flex flex-col min-w-0" style={{ gap: "5px" }}>
+                        <div className="text-[15px] sm:text-[16px] font-bold text-slate-200">{idx.name}</div>
+                        <div className="flex items-baseline flex-wrap" style={{ gap: "10px" }}>
+                          <span className="metric-value-primary text-slate-100">{idx.close?.toLocaleString("ko-KR")}</span>
+                          <PctCell v={idx.ret1w} size="lg" />
+                          {chgPt != null && (
+                            <span className={`text-[12px] font-medium tabular-nums ${chgPt >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                              {chgPt >= 0 ? "+" : ""}{chgPt.toFixed(2)}pt
+                            </span>
+                          )}
                         </div>
-                        {rangePct != null && (
-                          <div className="text-[13px] sm:text-[14px] font-semibold text-slate-400 tabular-nums">
-                            최저 대비 {rangePct.toFixed(2)}%
+                      </div>
+                      {rangePt != null && (
+                        <div className="text-right shrink-0">
+                          <div className="text-[13px] sm:text-[14px] font-semibold text-slate-400">주간 고저폭</div>
+                          <div className="text-[17px] sm:text-[19px] font-bold text-slate-100 tabular-nums leading-tight">
+                            {rangePt.toFixed(2)}pt
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 구분선 */}
-                  <div className="border-t border-slate-800" style={{ marginTop: "11px" }} />
-
-                  {/* 3행: 왼쪽 첫거래일→마지막거래일, 오른쪽 최고/최저+YTD */}
-                  <div className="grid grid-cols-2 items-start" style={{ gap: "12px", marginTop: "9px" }}>
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center gap-2">
-                        <LabelChip>{(idx.weekOpenDate || weekStart).slice(5).replace("-", "/")}</LabelChip>
-                        <span className="text-[13px] font-bold text-slate-200 tabular-nums">{(idx.weekOpenClose ?? idx.prevClose)?.toLocaleString("ko-KR")}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <LabelChip>{refFriday.slice(5).replace("-", "/")}</LabelChip>
-                        <span className="text-[13px] font-bold text-slate-200 tabular-nums">{idx.close?.toLocaleString("ko-KR")}</span>
-                      </div>
+                          {rangePct != null && (
+                            <div className="text-[13px] sm:text-[14px] font-semibold text-slate-400 tabular-nums">
+                              최저 대비 {rangePct.toFixed(2)}%
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="flex flex-col pl-3 border-l border-slate-800 gap-1.5">
-                      <div className="flex items-center gap-1.5 flex-wrap text-[12px] font-medium tabular-nums">
+
+                    {/* 구분선 */}
+                    <div className="border-t border-slate-800" />
+
+                    {/* 하단: 날짜종가(2행) / 최고·최저(2행) / YTD(2행 세로중앙) - 명시적 3열×2행 그리드 */}
+                    <div
+                      className="grid text-[12px] font-medium tabular-nums"
+                      style={{
+                        gridTemplateColumns: "minmax(150px, 1.1fr) minmax(180px, 1fr) minmax(95px, auto)",
+                        gridTemplateAreas: `"date1 high ytd" "date2 low ytd"`,
+                        columnGap: "14px",
+                        rowGap: "7px",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{ gridArea: "date1" }} className="flex items-center gap-2">
+                        <LabelChip>{(idx.weekOpenDate || weekStart).slice(5).replace("-", "/")}</LabelChip>
+                        <span className="text-[13px] font-bold text-slate-200">{(idx.weekOpenClose ?? idx.prevClose)?.toLocaleString("ko-KR")}</span>
+                      </div>
+                      <div style={{ gridArea: "date2" }} className="flex items-center gap-2">
+                        <LabelChip>{refFriday.slice(5).replace("-", "/")}</LabelChip>
+                        <span className="text-[13px] font-bold text-slate-200">{idx.close?.toLocaleString("ko-KR")}</span>
+                      </div>
+                      <div style={{ gridArea: "high" }} className="flex items-center gap-2 pl-3 border-l border-slate-800">
                         <LabelChip>최고</LabelChip><span className="text-slate-300">{idx.weekHigh?.toLocaleString("ko-KR")}</span>
+                      </div>
+                      <div style={{ gridArea: "low" }} className="flex items-center gap-2 pl-3 border-l border-slate-800">
                         <LabelChip>최저</LabelChip><span className="text-slate-300">{idx.weekLow?.toLocaleString("ko-KR")}</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
+                      <div style={{ gridArea: "ytd" }} className="flex flex-col items-start justify-center gap-1 pl-3 border-l border-slate-800">
                         <LabelChip>YTD</LabelChip>
                         <PctCell v={idx.retYtd} />
                       </div>
