@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { ChevronDown, Info } from "lucide-react";
-import type { WeeklyPriceRow } from "@/lib/sheets";
+import type { WeeklyPriceRow, WeeklyChartPoint } from "@/lib/sheets";
 import type { FxRate } from "@/lib/fx";
 
 // 평균 대신 중앙값을 쓰고 싶으면 이 값만 바꾸면 됩니다
@@ -131,12 +131,35 @@ const COL_W = {
 
 export default function PeerComparisonTable({
   rows,
+  weekChartData,
   fx,
 }: {
   rows: WeeklyPriceRow[]; // 이노스페이스 + 국내피어 + 해외피어 (지수 제외), 순서는 아래에서 재정렬
+  weekChartData: WeeklyChartPoint[]; // 종목별 그 주 실제 거래일별 시가/고가/저가/종가 (공휴일은 데이터 자체가 없음)
   fx: FxRate | null;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
+
+  // 종목코드별로 그 주 실제 거래일만 모아 시작일(월요일 또는 그 주 첫 거래일)/마지막 거래일(금요일
+  // 또는 그 주 마지막 거래일) 종가를 뽑아냄 - 공휴일이면 애초에 이 데이터 자체가 없으므로
+  // prevClose(지난주 금요일)를 잘못 이번 주 값으로 보여주던 문제가 근본적으로 해결됨
+  const weekEdgesByCode = useMemo(() => {
+    const map = new Map<string, { firstDate: string; firstClose: number; lastDate: string; lastClose: number }>();
+    const byCode = new Map<string, WeeklyChartPoint[]>();
+    weekChartData.forEach((p) => {
+      if (!byCode.has(p.code)) byCode.set(p.code, []);
+      byCode.get(p.code)!.push(p);
+    });
+    byCode.forEach((points, code) => {
+      const sorted = [...points].sort((a, b) => (a.date < b.date ? -1 : 1));
+      if (!sorted.length) return;
+      map.set(code, {
+        firstDate: sorted[0].date, firstClose: sorted[0].close,
+        lastDate: sorted[sorted.length - 1].date, lastClose: sorted[sorted.length - 1].close,
+      });
+    });
+    return map;
+  }, [weekChartData]);
 
   const innospace = rows.find((r) => r.code === "462350") || null;
   const domesticPeers = rows.filter((r) => r.category === "domestic" && r.code !== "462350");
@@ -147,13 +170,13 @@ export default function PeerComparisonTable({
   const ordered = innospace ? [innospace, ...usPeers, ...domesticPeers] : [...usPeers, ...domesticPeers];
 
   const refFriday = rows[0]?.refFriday || "";
-  const prevFriday = rows[0]?.prevFriday || "";
   const weekStart = refFriday ? addDaysStr(refFriday, -4) : "";
-  // 주의: prevClose 데이터는 실제로 "지난주 금요일 종가"이지 "이번 주 월요일 종가"가 아님.
-  // 헤더 라벨은 반드시 실제 값과 일치하는 prevFriday를 기준으로 표시해야 함 (Monday로 표시하면
-  // 실제로는 지난주 금요일 값인데 이번 주 월요일 값인 것처럼 잘못 라벨링되는 심각한 오류가 생김).
-  const startLabel = mmddWeekday(prevFriday);
-  const endLabel = mmddWeekday(refFriday);
+  // 헤더 라벨은 이노스페이스(항상 데이터가 있는 당사)의 그 주 실제 거래일 기준으로 표시.
+  // 계산으로 구한 "월요일"이 아니라 weekChartData(실제 거래 기록)의 첫/마지막 날짜를 쓰므로,
+  // 그 날이 공휴일이었다면 애초에 데이터가 없어서 자동으로 그 다음/이전 실제 거래일로 잡힘.
+  const innospaceEdges = weekEdgesByCode.get("462350");
+  const startLabel = mmddWeekday(innospaceEdges?.firstDate || weekStart);
+  const endLabel = mmddWeekday(innospaceEdges?.lastDate || refFriday);
 
   const maxAbsRet = useMemo(
     () => Math.max(0.01, ...ordered.map((r) => Math.abs(r.ret1w ?? 0))),
@@ -260,17 +283,17 @@ export default function PeerComparisonTable({
             <div className="flex flex-col justify-center gap-1.5 pl-3 border-l border-slate-800 text-[12px] font-medium tabular-nums" style={{ color: "#8495AD" }}>
               <span className="inline-flex items-center gap-1.5"><LabelChip>해외 평균</LabelChip><RetPct v={usAvg} /></span>
               <span className="inline-flex items-center gap-1.5"><LabelChip>국내 평균</LabelChip><RetPct v={domesticAvg} /></span>
-              <span className="inline-flex items-center gap-1.5 flex-wrap">
-                <LabelChip>상승</LabelChip><span className="text-red-400 font-semibold">{upCount}개사</span>
-                <LabelChip>하락</LabelChip><span className="text-blue-400 font-semibold">{downCount}개사</span>
-              </span>
             </div>
           </div>
+          <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-800 text-[12px] font-medium tabular-nums whitespace-nowrap" style={{ color: "#8495AD" }}>
+            <LabelChip>상승</LabelChip><span className="text-red-400 font-semibold">{upCount}개사</span>
+            <LabelChip>하락</LabelChip><span className="text-blue-400 font-semibold">{downCount}개사</span>
+          </div>
         </div>
-        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5">
+        <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 flex flex-col justify-center">
           <div className="text-[15px] sm:text-[16px] font-bold text-slate-200 mb-1.5">피어그룹 주간 등락 요약</div>
           {distStats ? (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2.5 justify-center">
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-2 min-w-0">
                   <span className="inline-block whitespace-nowrap text-[11px] font-bold px-2 py-0.5 rounded bg-red-400/15 text-red-300">최고 상승</span>
@@ -284,9 +307,6 @@ export default function PeerComparisonTable({
                   <span className="text-[14px] sm:text-[15px] font-semibold text-slate-200 truncate">{distStats.worst.name}</span>
                 </span>
                 <RetPct v={distStats.worst.ret1w} size="lg" />
-              </div>
-              <div className="text-[11px] sm:text-[12px] font-medium pt-1 border-t border-slate-800" style={{ color: "#8495AD" }}>
-                상승 {upCount}개사 · 하락 {downCount}개사{flatCount > 0 ? ` · 보합 ${flatCount}개사` : ""}
               </div>
             </div>
           ) : (
@@ -339,6 +359,10 @@ export default function PeerComparisonTable({
                 const isFirstDomestic = !isUs && !isOwn && !(i > 0 && ordered[i - 1].category === "domestic" && ordered[i - 1].code !== "462350");
                 const isOpen = expanded === r.code;
                 const localCap = fmtLocalCap(r.marketCap, isUs);
+                const edges = weekEdgesByCode.get(r.code);
+                // weekChartData가 아직 없는 회사(수집 초기 등)는 기존 prevClose/close로 대체 표시
+                const weekOpenClose = edges ? edges.firstClose : r.prevClose;
+                const weekCloseClose = edges ? edges.lastClose : r.close;
 
                 return (
                   <React.Fragment key={r.code}>
@@ -371,10 +395,10 @@ export default function PeerComparisonTable({
                         </span>
                       </td>
                       <td className="hidden sm:table-cell px-2 py-2 text-right text-slate-400">
-                        <PriceValue n={r.prevClose} isUs={isUs} />
+                        <PriceValue n={weekOpenClose} isUs={isUs} />
                       </td>
                       <td className="px-2 py-2 text-right text-slate-100">
-                        <PriceValue n={r.close} isUs={isUs} />
+                        <PriceValue n={weekCloseClose} isUs={isUs} />
                       </td>
                       <td className="px-3 py-2 text-right">
                         <RetPct v={r.ret1w} size="lg" />
@@ -398,7 +422,7 @@ export default function PeerComparisonTable({
                         <td colSpan={9} className="px-6 py-3">
                           <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-6 gap-y-2.5 text-[12px]">
                             <div className="sm:hidden flex items-center gap-1.5"><LabelChip>구분</LabelChip><span className="text-slate-300">{isOwn ? "당사" : isUs ? "해외" : "국내"}</span></div>
-                            <div className="sm:hidden flex items-center gap-1.5"><LabelChip>{startLabel} 종가</LabelChip><span className="text-slate-300 tabular-nums">{fmtPriceText(r.prevClose, isUs)}</span></div>
+                            <div className="sm:hidden flex items-center gap-1.5"><LabelChip>{startLabel} 종가</LabelChip><span className="text-slate-300 tabular-nums">{fmtPriceText(weekOpenClose, isUs)}</span></div>
                             <div className="flex items-center gap-1.5"><LabelChip>1개월</LabelChip><RetPct v={r.ret1m} /></div>
                             <div className="flex items-center gap-1.5"><LabelChip>3개월</LabelChip><RetPct v={r.ret3m} /></div>
                             <div className="flex items-center gap-1.5"><LabelChip>YTD</LabelChip><RetPct v={r.retYtd} /></div>
