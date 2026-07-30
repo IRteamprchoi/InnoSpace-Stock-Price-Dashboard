@@ -229,7 +229,7 @@ export default function PeerComparisonTable({
       {/* 상단 요약 카드 3개 */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
         <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5">
-          <div className="metric-label mb-1.5">이노스페이스 주간 등락률</div>
+          <div className="text-[15px] sm:text-[16px] font-bold text-slate-200 mb-1.5">이노스페이스 주간 등락률</div>
           <div className="grid grid-cols-2 gap-3">
             <RetPct v={innospace?.ret1w ?? null} size="xl" />
             <div className="flex flex-col justify-center gap-1 pl-3 border-l border-slate-800 text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
@@ -244,7 +244,7 @@ export default function PeerComparisonTable({
           </div>
         </div>
         <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5">
-          <div className="metric-label mb-1.5">{peerSummaryLabel}</div>
+          <div className="text-[15px] sm:text-[16px] font-bold text-slate-200 mb-1.5">{peerSummaryLabel}</div>
           <div className="grid grid-cols-2 gap-3">
             <RetPct v={peerSummaryStat} size="xl" />
             <div className="flex flex-col justify-center gap-1 pl-3 border-l border-slate-800 text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
@@ -255,19 +255,25 @@ export default function PeerComparisonTable({
           </div>
         </div>
         <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5">
-          <div className="metric-label mb-1.5">피어그룹 주간 성과 범위</div>
+          <div className="text-[15px] sm:text-[16px] font-bold text-slate-200 mb-1.5">피어그룹 주간 등락 요약</div>
           {distStats ? (
-            <div className="flex flex-col gap-1 text-[12.5px] font-medium">
+            <div className="flex flex-col gap-1.5 text-[12.5px] font-medium">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-slate-400 truncate">최고 {distStats.best.name}</span>
+                <span className="inline-flex items-center gap-1.5 truncate">
+                  <span className="inline-block whitespace-nowrap text-[10.5px] font-semibold px-1.5 py-0.5 rounded bg-red-400/15 text-red-300">최고 상승</span>
+                  <span className="text-slate-400 truncate">{distStats.best.name}</span>
+                </span>
                 <RetPct v={distStats.best.ret1w} size="sm" />
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-slate-400 truncate">최저 {distStats.worst.name}</span>
+                <span className="inline-flex items-center gap-1.5 truncate">
+                  <span className="inline-block whitespace-nowrap text-[10.5px] font-semibold px-1.5 py-0.5 rounded bg-blue-400/15 text-blue-300">최저 하락</span>
+                  <span className="text-slate-400 truncate">{distStats.worst.name}</span>
+                </span>
                 <RetPct v={distStats.worst.ret1w} size="sm" />
               </div>
               <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800">
-                <span className="text-slate-400">중앙값</span>
+                <span className="text-slate-400">등락률 중간값</span>
                 <RetPct v={distStats.median} size="sm" />
               </div>
             </div>
@@ -360,7 +366,6 @@ export default function PeerComparisonTable({
                       </td>
                       <td className="px-3 py-2 text-right">
                         <RetPct v={r.ret1w} size="lg" />
-                        <MiniBar v={r.ret1w} maxAbs={maxAbsRet} />
                       </td>
                       <td className="hidden sm:table-cell px-2 py-2 text-right text-slate-400">
                         <PriceValue n={r.weekHigh} isUs={isUs} />
@@ -385,8 +390,8 @@ export default function PeerComparisonTable({
                             <div><span className="text-slate-500">1개월 </span><RetPct v={r.ret1m} /></div>
                             <div><span className="text-slate-500">3개월 </span><RetPct v={r.ret3m} /></div>
                             <div><span className="text-slate-500">YTD </span><RetPct v={r.retYtd} /></div>
+                            <div><span className="text-slate-500">1주일간 거래량 </span><span className="text-slate-300 tabular-nums">{r.weekVolume != null ? r.weekVolume.toLocaleString("ko-KR") + "주" : "-"}</span></div>
                             <div><span className="text-slate-500">등락률 순위 </span><span className="text-slate-300 tabular-nums">{retRankMap.get(r.code)}위 / {ordered.length}개사</span></div>
-                            <div><span className="text-slate-500">시가총액 순위 </span><span className="text-slate-300 tabular-nums">{capRankMap.get(r.code)}위 / {ordered.length}개사</span></div>
                           </div>
                         </td>
                       </tr>
