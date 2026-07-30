@@ -43,8 +43,8 @@ function PriceValue({ n, isUs }: { n: number | null; isUs: boolean }) {
     ? n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : Math.round(n).toLocaleString("ko-KR");
   return (
-    <span className="tabular-nums">
-      <span className="metric-unit mr-0.5">{symbol}</span>
+    <span className="tabular-nums text-[13.5px] font-bold text-slate-100">
+      <span className="metric-unit mr-0.5 font-medium">{symbol}</span>
       {num}
     </span>
   );
@@ -68,13 +68,17 @@ function fmtLocalCap(n: number | null, isUs: boolean) {
   return "$" + (n / 1e6).toLocaleString("ko-KR", { maximumFractionDigits: 0 }) + "M";
 }
 
-function RetPct({ v, size = "base" }: { v: number | null; size?: "base" | "sm" | "lg" }) {
+function RetPct({ v, size = "base" }: { v: number | null; size?: "base" | "sm" | "lg" | "xl" }) {
   if (v == null) return <span className="text-slate-600">-</span>;
   const up = v > 0;
   const flat = v === 0;
   const color = flat ? "text-slate-400" : up ? "text-red-400" : "text-blue-400";
   const arrow = flat ? "―" : up ? "▲" : "▼";
-  const sizeClass = size === "lg" ? "text-[15px] sm:text-[16px] font-bold" : size === "sm" ? "text-[12.5px] font-semibold" : "text-[13px] font-bold";
+  const sizeClass =
+    size === "xl" ? "text-[22px] sm:text-[26px] font-extrabold" :
+    size === "lg" ? "text-[16px] sm:text-[17px] font-extrabold" :
+    size === "sm" ? "text-[12.5px] font-semibold" :
+    "text-[14px] font-bold";
   return (
     <span className={`inline-flex items-center gap-1 tabular-nums ${sizeClass} ${color}`}>
       <span>{arrow}</span>
@@ -192,6 +196,18 @@ export default function PeerComparisonTable({
     return map;
   }, [ordered, fx]);
 
+  // 피어그룹 주간 성과 범위 (당사 포함 전체 분포 기준)
+  const distStats = useMemo(() => {
+    const withRet = ordered.filter((r) => r.ret1w != null);
+    if (!withRet.length) return null;
+    const best = withRet.reduce((a, b) => (b.ret1w! > a.ret1w! ? b : a));
+    const worst = withRet.reduce((a, b) => (b.ret1w! < a.ret1w! ? b : a));
+    const sorted = [...withRet].sort((a, b) => a.ret1w! - b.ret1w!);
+    const mid = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2 ? sorted[mid].ret1w! : (sorted[mid - 1].ret1w! + sorted[mid].ret1w!) / 2;
+    return { best, worst, median };
+  }, [ordered]);
+
   const hasUs = usPeers.length > 0;
 
   return (
@@ -215,7 +231,7 @@ export default function PeerComparisonTable({
         <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5">
           <div className="metric-label mb-1.5">이노스페이스 주간 등락률</div>
           <div className="grid grid-cols-2 gap-3">
-            <RetPct v={innospace?.ret1w ?? null} size="lg" />
+            <RetPct v={innospace?.ret1w ?? null} size="xl" />
             <div className="flex flex-col justify-center gap-1 pl-3 border-l border-slate-800 text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
               {innospace?.ret1w != null && peerSummaryStat != null && (
                 <span>평균 대비 {(innospace.ret1w - peerSummaryStat >= 0 ? "+" : "")}{(innospace.ret1w - peerSummaryStat).toFixed(2)}%p</span>
@@ -230,7 +246,7 @@ export default function PeerComparisonTable({
         <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5">
           <div className="metric-label mb-1.5">{peerSummaryLabel}</div>
           <div className="grid grid-cols-2 gap-3">
-            <RetPct v={peerSummaryStat} size="lg" />
+            <RetPct v={peerSummaryStat} size="xl" />
             <div className="flex flex-col justify-center gap-1 pl-3 border-l border-slate-800 text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
               <span className="inline-flex items-center gap-1">해외 평균 <RetPct v={usAvg} /></span>
               <span className="inline-flex items-center gap-1">국내 평균 <RetPct v={domesticAvg} /></span>
@@ -239,16 +255,25 @@ export default function PeerComparisonTable({
           </div>
         </div>
         <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5">
-          <div className="metric-label mb-1.5">피어그룹 내 주간 등락률 순위</div>
-          <div className="grid grid-cols-2 gap-3">
-            <span className="metric-value-primary text-slate-100 tabular-nums">
-              {rankInfo ? `${rankInfo.rank}위 / ${rankInfo.total}개사` : "-"}
-            </span>
-            <div className="flex flex-col justify-center gap-1 pl-3 border-l border-slate-800 text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
-              <span>주간 등락률 내림차순</span>
-              <span>당사 포함 {rankInfo?.total ?? ""}개사 기준</span>
+          <div className="metric-label mb-1.5">피어그룹 주간 성과 범위</div>
+          {distStats ? (
+            <div className="flex flex-col gap-1 text-[12.5px] font-medium">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-400 truncate">최고 {distStats.best.name}</span>
+                <RetPct v={distStats.best.ret1w} size="sm" />
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-slate-400 truncate">최저 {distStats.worst.name}</span>
+                <RetPct v={distStats.worst.ret1w} size="sm" />
+              </div>
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800">
+                <span className="text-slate-400">중앙값</span>
+                <RetPct v={distStats.median} size="sm" />
+              </div>
             </div>
-          </div>
+          ) : (
+            <span className="text-slate-600 text-[13px]">-</span>
+          )}
         </div>
       </div>
 
@@ -344,8 +369,8 @@ export default function PeerComparisonTable({
                         <PriceValue n={r.weekLow} isUs={isUs} />
                       </td>
                       <td className="px-3 py-2 text-right">
-                        <div className="font-semibold text-slate-100 tabular-nums text-[13px]">{fmtMarketCapKrw(krwMarketCap(r))}</div>
-                        {localCap && <div className="text-[11px] text-slate-500 mt-0.5">{localCap}</div>}
+                        <div className="font-bold text-slate-100 tabular-nums text-[13.5px]">{fmtMarketCapKrw(krwMarketCap(r))}</div>
+                        {localCap && <div className="text-[11px] font-medium text-slate-500 mt-0.5">{localCap}</div>}
                       </td>
                       <td className="px-2 text-center">
                         <ChevronDown size={15} className={`text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
