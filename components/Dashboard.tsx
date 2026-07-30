@@ -157,7 +157,6 @@ export default function DailyDashboard({ dailyData, intradayData }: { dailyData:
 
   const sorted = useMemo(() => [...dailyData].sort((a, b) => a.d.localeCompare(b.d)), [dailyData]);
   const latest = sorted[sorted.length - 1];
-  const prevClose = sorted.length > 1 ? sorted[sorted.length - 2].close : latest?.close;
   const marketOpen = isMarketOpenNow();
 
   // 장중 참고 시세: intraday_price 시트의 가장 최근 값 사용.
@@ -177,6 +176,13 @@ export default function DailyDashboard({ dailyData, intradayData }: { dailyData:
     : latest
     ? { close: latest.close, chg: latest.chg, chgPct: latest.chgPct, open: latest.open, high: latest.high, low: latest.low, vol: latest.vol, amt: latest.amt, mcap: latest.mcap }
     : null;
+
+  // 전일종가: latest(daily_data 최신 행)가 "오늘"을 가리키면(=todayConfirmed) 그 하루 전 값을,
+  // latest가 아직 "어제"를 가리키는 상태면(오늘자 확정 전) latest 자신이 곧 전일종가임 -
+  // "일별 주가 및 거래 현황" 박스가 보여주는 종가와 항상 같은 숫자를 가리키도록 고정
+  const prevClose = todayConfirmed
+    ? (sorted.length > 1 ? sorted[sorted.length - 2].close : latest?.close)
+    : latest?.close;
 
   const rangeDays = RANGES.find((r) => r.key === range)!.days;
   const chartData = useMemo(() => {
