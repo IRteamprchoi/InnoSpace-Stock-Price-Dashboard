@@ -115,12 +115,21 @@ export default function MiniStockChart({
     };
   }, [sorted, distinctDays, prevClose]);
 
-  if (qualifiedDays.length < MIN_TRADING_DAYS) {
+  if (sorted.length < 2) {
     return <StockChartLoading height={height} daysCollected={qualifiedDays.length} />;
   }
 
+  const isPartial = qualifiedDays.length < MIN_TRADING_DAYS;
+
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <div style={{ position: "relative" }}>
+      {isPartial && (
+        <div className="absolute top-0 right-0 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-900/90 border border-slate-700">
+          <Clock size={9} className="text-amber-400" />
+          <span className="text-[9.5px] font-semibold text-amber-400">{qualifiedDays.length}/{MIN_TRADING_DAYS}일 수집 중</span>
+        </div>
+      )}
+      <ResponsiveContainer width="100%" height={height}>
       <ComposedChart data={rows} margin={{ top: 8, right: 4, left: 0, bottom: 4 }}>
         {/* 거래일 경계: 아주 옅은 세로 구분선 */}
         {dayTicks.slice(1).map((t) => (
@@ -170,5 +179,6 @@ export default function MiniStockChart({
         <Tooltip content={<StockChartTooltip isUs={isUs} />} cursor={{ stroke: "#334155", strokeWidth: 1 }} />
       </ComposedChart>
     </ResponsiveContainer>
+    </div>
   );
 }
