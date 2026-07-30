@@ -229,9 +229,21 @@ export default function WeeklyDashboard({
           <div className="grid grid-cols-2 gap-3">
             {indices.map((idx) => {
               const chgPt = idx.close != null && idx.prevClose != null ? idx.close - idx.prevClose : null;
+              const rangePt = idx.weekHigh != null && idx.weekLow != null ? idx.weekHigh - idx.weekLow : null;
+              const rangePct = rangePt != null && idx.weekLow ? (rangePt / idx.weekLow) * 100 : null;
               return (
                 <div key={idx.code} className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3.5 sm:px-5 flex flex-col gap-2.5">
-                  <div className="metric-label">{idx.name}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-[15px] sm:text-[16px] font-bold text-slate-200">{idx.name}</div>
+                    {rangePt != null && (
+                      <div className="text-right shrink-0">
+                        <div className="text-[11px] text-slate-500 font-medium">주간 변동폭</div>
+                        <div className="text-[12.5px] font-bold text-slate-300 tabular-nums">
+                          {rangePt.toFixed(2)}pt{rangePct != null && <span className="text-slate-500 font-medium"> · {rangePct.toFixed(2)}%</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-baseline gap-3 flex-wrap">
                     <span className="metric-value-primary text-slate-100">{idx.close?.toLocaleString("ko-KR")}</span>
                     <PctCell v={idx.ret1w} size="lg" />
