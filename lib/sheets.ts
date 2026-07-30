@@ -358,6 +358,7 @@ export async function getWeeklyChartData(): Promise<WeeklyChartPoint[]> {
 export type WeeklyIntradayRow = {
   tradeDate: string;
   time: string;
+  fullTimestamp: string;
   code: string;
   name: string;
   market: string;
@@ -379,14 +380,15 @@ export async function getWeeklyIntradayPrice(): Promise<WeeklyIntradayRow[]> {
   const rows = parseCsv(text);
   const [, ...dataRows] = rows;
 
-  // 컬럼 순서: 거래일, 측정시각, 종목코드, 기업명, 시장, 현지시간, 한국시간, 주가, 통화, 출처, 수집시각, 간격
+  // 컬럼 순서: 거래일, 측정시각, 전체_timestamp, 종목코드, 기업명, 시장, 현지시간, 한국시간, 주가, 통화, 출처, 수집시각, 간격
   return dataRows.map((r) => ({
     tradeDate: r[0],
     time: r[1],
-    code: r[2],
-    name: r[3],
-    market: r[4],
-    price: num(r[7]),
+    fullTimestamp: r[2],
+    code: r[3],
+    name: r[4],
+    market: r[5],
+    price: num(r[8]),
   }));
 }
 
