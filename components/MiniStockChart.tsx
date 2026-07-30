@@ -10,6 +10,7 @@ const UP_COLOR = "#f87171";
 const DOWN_COLOR = "#60a5fa";
 const FLAT_COLOR = "#94a3b8";
 const MIN_TRADING_DAYS = 5; // 5거래일치가 쌓이기 전까지는 "데이터 수집 중"으로 표시
+const MIN_POINTS_PER_DAY = 3; // 하루에 포인트가 이 개수 미만이면 "그날은 제대로 수집 안 됨"으로 간주
 
 function fmtPrice(n: number, isUs: boolean) {
   if (isUs) return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -59,6 +60,15 @@ export default function MiniStockChart({
 
   const distinctDays = useMemo(() => Array.from(new Set(sorted.map((p) => p.date))), [sorted]);
 
+  // "5거래일 확보" 판정을 단순히 날짜가 5개 있는지가 아니라, 각 날짜에 실제로 데이터가
+  // 촘촘히(하루 최소 MIN_POINTS_PER_DAY개) 쌓였는지까지 확인 - API 오류 등으로 하루에
+  // 포인트가 1~2개뿐이었던 날은 "제대로 수집된 날"로 치지 않음
+  const qualifiedDays = useMemo(() => {
+    const counts = new Map<string, number>();
+    sorted.forEach((p) => counts.set(p.date, (counts.get(p.date) || 0) + 1));
+    return distinctDays.filter((d) => (counts.get(d) || 0) >= MIN_POINTS_PER_DAY);
+  }, [sorted, distinctDays]);
+
   const { rows, segs, dayTicks, yMin, yMax, priceTicks, refPrice } = useMemo(() => {
     // 날짜별로 묶어서, 하루 안에서는 실제 수집된 순서 그대로, 날짜 사이에는 x를 정수 단위로
     // 띄워서(야간 공백을 그대로 그리지 않고) 거래일마다 같은 폭을 갖도록 배치
@@ -105,8 +115,8 @@ export default function MiniStockChart({
     };
   }, [sorted, distinctDays, prevClose]);
 
-  if (distinctDays.length < MIN_TRADING_DAYS) {
-    return <StockChartLoading height={height} daysCollected={distinctDays.length} />;
+  if (qualifiedDays.length < MIN_TRADING_DAYS) {
+    return <StockChartLoading height={height} daysCollected={qualifiedDays.length} />;
   }
 
   return (
