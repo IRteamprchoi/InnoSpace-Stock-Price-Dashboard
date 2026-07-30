@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { ExternalLink } from "lucide-react";
-import type { WeeklyPriceRow, WeeklyNewsRow, WeeklyIntradayRow } from "@/lib/sheets";
+import type { WeeklyPriceRow, WeeklyNewsRow, WeeklyIntradayRow, WeeklyChartPoint } from "@/lib/sheets";
 import type { FxRate } from "@/lib/fx";
 import MiniStockChart from "./MiniStockChart";
 import PeerComparisonTable from "./PeerComparisonTable";
@@ -200,12 +200,14 @@ export default function WeeklyDashboard({
   news,
   innospaceIntraday,
   peerIntraday,
+  weekChartData,
   fx,
 }: {
   prices: WeeklyPriceRow[];
   news: WeeklyNewsRow[];
   innospaceIntraday: { date: string; time: string; price: number }[];
   peerIntraday: WeeklyIntradayRow[];
+  weekChartData: WeeklyChartPoint[];
   fx: FxRate | null;
 }) {
   const orderedRows = useMemo(() => orderForComparison(prices), [prices]);
@@ -316,7 +318,7 @@ export default function WeeklyDashboard({
       )}
 
       <div className="mb-10">
-        <PeerComparisonTable rows={orderedRows} fx={fx} />
+        <PeerComparisonTable rows={orderedRows} weekChartData={weekChartData} fx={fx} />
       </div>
 
       <div className="flex items-center gap-3 mb-1">
