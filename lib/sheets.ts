@@ -201,6 +201,7 @@ export type WeeklyPriceRow = {
   refYtdClose: number | null;
   marketCap: number | null;
   shares: number | null;
+  weekVolume: number | null;
 };
 
 export type WeeklyNewsRow = {
@@ -249,6 +250,7 @@ export async function getWeeklyPrices(): Promise<WeeklyPriceRow[]> {
     refYtdClose: numOrNull(r[16]),
     marketCap: numOrNull(r[17]),
     shares: numOrNull(r[18]),
+    weekVolume: numOrNull(r[19]),
   }));
 }
 
