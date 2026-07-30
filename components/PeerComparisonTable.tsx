@@ -110,6 +110,14 @@ function Badge({ label, tone }: { label: string; tone: "own" | "domestic" | "us"
   );
 }
 
+function LabelChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-block whitespace-nowrap text-[10.5px] font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+      {children}
+    </span>
+  );
+}
+
 // 데스크톱 권장 열 너비
 const COL_W = {
   badge: "70px",
@@ -233,13 +241,13 @@ export default function PeerComparisonTable({
           <div className="text-[15px] sm:text-[16px] font-bold text-slate-200 mb-1.5">이노스페이스 주간 등락률</div>
           <div className="grid grid-cols-2 gap-3">
             <RetPct v={innospace?.ret1w ?? null} size="xl" />
-            <div className="flex flex-col justify-center gap-1 pl-3 border-l border-slate-800 text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
+            <div className="flex flex-col justify-center gap-1.5 pl-3 border-l border-slate-800 text-[12px] font-medium tabular-nums" style={{ color: "#8495AD" }}>
               {innospace?.ret1w != null && peerSummaryStat != null && (
-                <span>평균 대비 {(innospace.ret1w - peerSummaryStat >= 0 ? "+" : "")}{(innospace.ret1w - peerSummaryStat).toFixed(2)}%p</span>
+                <span className="inline-flex items-center gap-1.5"><LabelChip>평균 대비</LabelChip>{(innospace.ret1w - peerSummaryStat >= 0 ? "+" : "")}{(innospace.ret1w - peerSummaryStat).toFixed(2)}%p</span>
               )}
-              {rankInfo && <span>{rankInfo.total}개사 중 {rankInfo.rank}위</span>}
+              {rankInfo && <span className="inline-flex items-center gap-1.5"><LabelChip>순위</LabelChip>{rankInfo.total}개사 중 {rankInfo.rank}위</span>}
               {innospace?.ret1m != null && (
-                <span className="inline-flex items-center gap-1">1개월 <RetPct v={innospace.ret1m} /></span>
+                <span className="inline-flex items-center gap-1.5"><LabelChip>1개월</LabelChip><RetPct v={innospace.ret1m} /></span>
               )}
             </div>
           </div>
@@ -248,10 +256,10 @@ export default function PeerComparisonTable({
           <div className="text-[15px] sm:text-[16px] font-bold text-slate-200 mb-1.5">{peerSummaryLabel}</div>
           <div className="grid grid-cols-2 gap-3">
             <RetPct v={peerSummaryStat} size="xl" />
-            <div className="flex flex-col justify-center gap-1 pl-3 border-l border-slate-800 text-[11px] sm:text-[12px] font-medium" style={{ color: "#8495AD" }}>
-              <span className="inline-flex items-center gap-1">해외 평균 <RetPct v={usAvg} /></span>
-              <span className="inline-flex items-center gap-1">국내 평균 <RetPct v={domesticAvg} /></span>
-              <span>상승 <span className="text-red-400 font-semibold">{upCount}</span> · 하락 <span className="text-blue-400 font-semibold">{downCount}개사</span></span>
+            <div className="flex flex-col justify-center gap-1.5 pl-3 border-l border-slate-800 text-[12px] font-medium tabular-nums" style={{ color: "#8495AD" }}>
+              <span className="inline-flex items-center gap-1.5"><LabelChip>해외 평균</LabelChip><RetPct v={usAvg} /></span>
+              <span className="inline-flex items-center gap-1.5"><LabelChip>국내 평균</LabelChip><RetPct v={domesticAvg} /></span>
+              <span className="inline-flex items-center gap-1.5"><LabelChip>상승·하락</LabelChip><span className="text-red-400 font-semibold">{upCount}</span> · <span className="text-blue-400 font-semibold">{downCount}개사</span></span>
             </div>
           </div>
         </div>
@@ -384,14 +392,14 @@ export default function PeerComparisonTable({
                     {isOpen && (
                       <tr className="bg-slate-950/40 border-b border-slate-800/50">
                         <td colSpan={9} className="px-6 py-3">
-                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-6 gap-y-2 text-[12px]">
-                            <div className="sm:hidden"><span className="text-slate-500">구분 </span><span className="text-slate-300">{isOwn ? "당사" : isUs ? "해외" : "국내"}</span></div>
-                            <div className="sm:hidden"><span className="text-slate-500">{startLabel} 종가 </span><span className="text-slate-300 tabular-nums">{fmtPriceText(r.prevClose, isUs)}</span></div>
-                            <div><span className="text-slate-500">1개월 </span><RetPct v={r.ret1m} /></div>
-                            <div><span className="text-slate-500">3개월 </span><RetPct v={r.ret3m} /></div>
-                            <div><span className="text-slate-500">YTD </span><RetPct v={r.retYtd} /></div>
-                            <div><span className="text-slate-500">1주일간 거래량 </span><span className="text-slate-300 tabular-nums">{r.weekVolume != null ? r.weekVolume.toLocaleString("ko-KR") + "주" : "-"}</span></div>
-                            <div><span className="text-slate-500">등락률 순위 </span><span className="text-slate-300 tabular-nums">{retRankMap.get(r.code)}위 / {ordered.length}개사</span></div>
+                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-x-6 gap-y-2.5 text-[12px]">
+                            <div className="sm:hidden flex items-center gap-1.5"><LabelChip>구분</LabelChip><span className="text-slate-300">{isOwn ? "당사" : isUs ? "해외" : "국내"}</span></div>
+                            <div className="sm:hidden flex items-center gap-1.5"><LabelChip>{startLabel} 종가</LabelChip><span className="text-slate-300 tabular-nums">{fmtPriceText(r.prevClose, isUs)}</span></div>
+                            <div className="flex items-center gap-1.5"><LabelChip>1개월</LabelChip><RetPct v={r.ret1m} /></div>
+                            <div className="flex items-center gap-1.5"><LabelChip>3개월</LabelChip><RetPct v={r.ret3m} /></div>
+                            <div className="flex items-center gap-1.5"><LabelChip>YTD</LabelChip><RetPct v={r.retYtd} /></div>
+                            <div className="flex items-center gap-1.5"><LabelChip>1주일간 거래량</LabelChip><span className="text-slate-300 tabular-nums">{r.weekVolume != null ? r.weekVolume.toLocaleString("ko-KR") + "주" : "-"}</span></div>
+                            <div className="flex items-center gap-1.5"><LabelChip>등락률 순위</LabelChip><span className="text-slate-300 tabular-nums">{retRankMap.get(r.code)}위 / {ordered.length}개사</span></div>
                           </div>
                         </td>
                       </tr>
