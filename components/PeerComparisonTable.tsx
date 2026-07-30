@@ -172,6 +172,7 @@ export default function PeerComparisonTable({
   const usAvg = usRets.length ? usRets.reduce((a, b) => a + b, 0) / usRets.length : null;
   const upCount = peerRets.filter((v) => v > 0).length;
   const downCount = peerRets.filter((v) => v < 0).length;
+  const flatCount = peerRets.filter((v) => v === 0).length;
 
   const rankInfo = useMemo(() => {
     if (!innospace) return null;
@@ -257,24 +258,23 @@ export default function PeerComparisonTable({
         <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5">
           <div className="text-[15px] sm:text-[16px] font-bold text-slate-200 mb-1.5">피어그룹 주간 등락 요약</div>
           {distStats ? (
-            <div className="flex flex-col gap-1.5 text-[12.5px] font-medium">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5 truncate">
-                  <span className="inline-block whitespace-nowrap text-[10.5px] font-semibold px-1.5 py-0.5 rounded bg-red-400/15 text-red-300">최고 상승</span>
-                  <span className="text-slate-400 truncate">{distStats.best.name}</span>
+                <span className="inline-flex items-center gap-2 min-w-0">
+                  <span className="inline-block whitespace-nowrap text-[11px] font-bold px-2 py-0.5 rounded bg-red-400/15 text-red-300">최고 상승</span>
+                  <span className="text-[14px] sm:text-[15px] font-semibold text-slate-200 truncate">{distStats.best.name}</span>
                 </span>
-                <RetPct v={distStats.best.ret1w} size="sm" />
+                <RetPct v={distStats.best.ret1w} size="lg" />
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5 truncate">
-                  <span className="inline-block whitespace-nowrap text-[10.5px] font-semibold px-1.5 py-0.5 rounded bg-blue-400/15 text-blue-300">최저 하락</span>
-                  <span className="text-slate-400 truncate">{distStats.worst.name}</span>
+                <span className="inline-flex items-center gap-2 min-w-0">
+                  <span className="inline-block whitespace-nowrap text-[11px] font-bold px-2 py-0.5 rounded bg-blue-400/15 text-blue-300">최대 하락</span>
+                  <span className="text-[14px] sm:text-[15px] font-semibold text-slate-200 truncate">{distStats.worst.name}</span>
                 </span>
-                <RetPct v={distStats.worst.ret1w} size="sm" />
+                <RetPct v={distStats.worst.ret1w} size="lg" />
               </div>
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800">
-                <span className="text-slate-400">등락률 중간값</span>
-                <RetPct v={distStats.median} size="sm" />
+              <div className="text-[11px] sm:text-[12px] font-medium pt-1 border-t border-slate-800" style={{ color: "#8495AD" }}>
+                상승 {upCount}개사 · 하락 {downCount}개사{flatCount > 0 ? ` · 보합 ${flatCount}개사` : ""}
               </div>
             </div>
           ) : (
@@ -287,7 +287,7 @@ export default function PeerComparisonTable({
       <div className="flex items-center gap-1.5 px-2.5 py-1.5 mb-2">
         <Info size={13} style={{ color: PERIOD_COLOR }} />
         <span className="text-[13px] font-medium" style={{ color: PERIOD_COLOR }}>
-          각 기업 행을 클릭하면 주간 최고·최저 및 기간별 수익률을 확인할 수 있습니다.
+          각 기업 행을 클릭하면 기간별 수익률, 주간 거래량 및 피어그룹 내 주간 등락률 순위를 확인할 수 있습니다.
         </span>
       </div>
 
