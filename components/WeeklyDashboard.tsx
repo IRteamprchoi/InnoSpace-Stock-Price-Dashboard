@@ -287,9 +287,15 @@ export default function WeeklyDashboard({
 
                   {/* 3행: 왼쪽 주초→주말, 오른쪽 최고/최저+YTD */}
                   <div className="grid grid-cols-2 items-start" style={{ gap: "12px", marginTop: "9px" }}>
-                    <div className="flex flex-col gap-1.5">
-                      <LabelChip>{weekStart.slice(5).replace("-", "/")} → {refFriday.slice(5).replace("-", "/")}</LabelChip>
-                      <span className="text-[12px] font-medium tabular-nums text-slate-300">{idx.prevClose?.toLocaleString("ko-KR")} → {idx.close?.toLocaleString("ko-KR")}</span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <div className="bg-slate-950/50 rounded px-2 py-1.5">
+                        <div className="text-[10.5px] font-semibold text-slate-500">{weekStart.slice(5).replace("-", "/")}</div>
+                        <div className="text-[12px] font-bold text-slate-300 tabular-nums">{idx.prevClose?.toLocaleString("ko-KR")}</div>
+                      </div>
+                      <div className="bg-slate-950/50 rounded px-2 py-1.5">
+                        <div className="text-[10.5px] font-semibold text-slate-500">{refFriday.slice(5).replace("-", "/")}</div>
+                        <div className="text-[12px] font-bold text-slate-300 tabular-nums">{idx.close?.toLocaleString("ko-KR")}</div>
+                      </div>
                     </div>
                     <div className="flex flex-col pl-3 border-l border-slate-800 gap-1.5">
                       <div className="flex items-center gap-1.5 flex-wrap text-[12px] font-medium tabular-nums">
