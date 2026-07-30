@@ -147,8 +147,12 @@ export default function PeerComparisonTable({
   const ordered = innospace ? [innospace, ...usPeers, ...domesticPeers] : [...usPeers, ...domesticPeers];
 
   const refFriday = rows[0]?.refFriday || "";
+  const prevFriday = rows[0]?.prevFriday || "";
   const weekStart = refFriday ? addDaysStr(refFriday, -4) : "";
-  const startLabel = mmddWeekday(weekStart);
+  // 주의: prevClose 데이터는 실제로 "지난주 금요일 종가"이지 "이번 주 월요일 종가"가 아님.
+  // 헤더 라벨은 반드시 실제 값과 일치하는 prevFriday를 기준으로 표시해야 함 (Monday로 표시하면
+  // 실제로는 지난주 금요일 값인데 이번 주 월요일 값인 것처럼 잘못 라벨링되는 심각한 오류가 생김).
+  const startLabel = mmddWeekday(prevFriday);
   const endLabel = mmddWeekday(refFriday);
 
   const maxAbsRet = useMemo(
@@ -227,12 +231,9 @@ export default function PeerComparisonTable({
           <span className="w-1 h-4 bg-amber-400 rounded-sm shrink-0" />
           <h2 className="section-title">이노스페이스 및 피어그룹 주간 주가 동향</h2>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-0.5 sm:gap-3">
-          <p className="text-[13px] text-slate-500">주간 종가 변동 및 시가총액 비교</p>
-          <p className="text-[13px] sm:text-[14px] font-medium" style={{ color: PERIOD_COLOR }}>
-            <span className="font-semibold">기준기간</span> {dotDateWeekday(weekStart)} ~ {dotDateWeekday(refFriday)}
-          </p>
-        </div>
+        <p className="text-[13px] sm:text-[14px] font-medium" style={{ color: PERIOD_COLOR }}>
+          <span className="font-semibold">기준기간</span> {dotDateWeekday(weekStart)} ~ {dotDateWeekday(refFriday)}
+        </p>
       </div>
 
       {/* 상단 요약 카드 3개 */}
@@ -259,7 +260,10 @@ export default function PeerComparisonTable({
             <div className="flex flex-col justify-center gap-1.5 pl-3 border-l border-slate-800 text-[12px] font-medium tabular-nums" style={{ color: "#8495AD" }}>
               <span className="inline-flex items-center gap-1.5"><LabelChip>해외 평균</LabelChip><RetPct v={usAvg} /></span>
               <span className="inline-flex items-center gap-1.5"><LabelChip>국내 평균</LabelChip><RetPct v={domesticAvg} /></span>
-              <span className="inline-flex items-center gap-1.5"><LabelChip>상승·하락</LabelChip><span className="text-red-400 font-semibold">{upCount}</span> · <span className="text-blue-400 font-semibold">{downCount}개사</span></span>
+              <span className="inline-flex items-center gap-1.5 flex-wrap">
+                <LabelChip>상승</LabelChip><span className="text-red-400 font-semibold">{upCount}개사</span>
+                <LabelChip>하락</LabelChip><span className="text-blue-400 font-semibold">{downCount}개사</span>
+              </span>
             </div>
           </div>
         </div>
