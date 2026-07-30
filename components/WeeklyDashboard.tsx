@@ -232,11 +232,23 @@ export default function WeeklyDashboard({
               const rangePt = idx.weekHigh != null && idx.weekLow != null ? idx.weekHigh - idx.weekLow : null;
               const rangePct = rangePt != null && idx.weekLow ? (rangePt / idx.weekLow) * 100 : null;
               return (
-                <div key={idx.code} className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 py-3.5 sm:px-5 flex flex-col gap-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="text-[15px] sm:text-[16px] font-bold text-slate-200">{idx.name}</div>
+                <div key={idx.code} className="bg-slate-900/70 border border-slate-700 rounded-lg" style={{ height: "auto", minHeight: 0, padding: "15px 18px" }}>
+                  {/* 1~2행: 왼쪽 지수명+값, 오른쪽 주간고저폭 */}
+                  <div className="grid items-start" style={{ gridTemplateColumns: "minmax(0, 1fr) auto", gap: "20px" }}>
+                    <div className="flex flex-col min-w-0" style={{ gap: "5px" }}>
+                      <div className="text-[15px] sm:text-[16px] font-bold text-slate-200">{idx.name}</div>
+                      <div className="flex items-baseline flex-wrap" style={{ gap: "10px" }}>
+                        <span className="metric-value-primary text-slate-100">{idx.close?.toLocaleString("ko-KR")}</span>
+                        <PctCell v={idx.ret1w} size="lg" />
+                        {chgPt != null && (
+                          <span className={`text-[12px] font-medium tabular-nums ${chgPt >= 0 ? "text-red-400" : "text-blue-400"}`}>
+                            {chgPt >= 0 ? "+" : ""}{chgPt.toFixed(2)}pt
+                          </span>
+                        )}
+                      </div>
+                    </div>
                     {rangePt != null && (
-                      <div className="text-right shrink-0 flex flex-col items-end justify-center">
+                      <div className="text-right shrink-0">
                         <div className="text-[13px] sm:text-[14px] font-semibold text-slate-400">주간 고저폭</div>
                         <div className="text-[17px] sm:text-[19px] font-bold text-slate-100 tabular-nums leading-tight">
                           {rangePt.toFixed(2)}pt
@@ -249,21 +261,17 @@ export default function WeeklyDashboard({
                       </div>
                     )}
                   </div>
-                  <div className="flex items-baseline gap-3 flex-wrap">
-                    <span className="metric-value-primary text-slate-100">{idx.close?.toLocaleString("ko-KR")}</span>
-                    <PctCell v={idx.ret1w} size="lg" />
-                    {chgPt != null && (
-                      <span className={`text-[12px] font-medium tabular-nums ${chgPt >= 0 ? "text-red-400" : "text-blue-400"}`}>
-                        {chgPt >= 0 ? "+" : ""}{chgPt.toFixed(2)}pt
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+
+                  {/* 구분선 */}
+                  <div className="border-t border-slate-800" style={{ marginTop: "11px" }} />
+
+                  {/* 3행: 왼쪽 주초→주말, 오른쪽 최고/최저+YTD */}
+                  <div className="grid grid-cols-2" style={{ gap: "12px", marginTop: "9px" }}>
                     <div className="text-[12px] text-slate-500 font-medium tabular-nums">
                       주초 → 주말<br />
                       <span className="text-slate-300">{idx.prevClose?.toLocaleString("ko-KR")} → {idx.close?.toLocaleString("ko-KR")}</span>
                     </div>
-                    <div className="flex flex-col gap-1 pl-3 border-l border-slate-800 text-[12px] font-medium tabular-nums">
+                    <div className="flex flex-col pl-3 border-l border-slate-800 text-[12px] font-medium tabular-nums" style={{ gap: "4px" }}>
                       <div className="text-slate-500">최고 <span className="text-slate-300">{idx.weekHigh?.toLocaleString("ko-KR")}</span> · 최저 <span className="text-slate-300">{idx.weekLow?.toLocaleString("ko-KR")}</span></div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-slate-500">YTD</span>
