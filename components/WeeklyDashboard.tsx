@@ -97,6 +97,12 @@ function RetArrow({ v }: { v: number | null }) {
   );
 }
 
+function addDaysStr(dateStr: string, n: number) {
+  const d = new Date(dateStr + "T00:00:00+09:00");
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function ChartGrid({
   rows,
   innospaceIntraday,
@@ -116,10 +122,16 @@ function ChartGrid({
       {companies.map((r) => {
         const isInnospace = r.code === "462350";
         const isUs = r.category === "us";
+        // 표·뉴스와 동일한 리포트 주간(월~금)으로만 차트를 고정 - 계속 누적해서 보여주지 않고,
+        // 다음 주 리포트(다음 월요일)가 새로 나올 때까지는 이 범위 그대로 유지됨
+        const weekStart = r.refFriday ? addDaysStr(r.refFriday, -4) : "";
+        const weekEndExclusive = r.refFriday ? addDaysStr(r.refFriday, 1) : "";
+        const inWeek = (date: string) => date >= weekStart && date < weekEndExclusive;
+
         const points = isInnospace
-          ? innospaceIntraday
+          ? innospaceIntraday.filter((p) => inWeek(p.date))
           : peerIntraday
-              .filter((p) => p.code === r.code)
+              .filter((p) => p.code === r.code && inWeek(p.tradeDate))
               .map((p) => ({ date: p.tradeDate, time: p.time, price: p.price }));
         const companyNews = news.filter((n) => n.name === r.name);
 
