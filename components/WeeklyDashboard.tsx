@@ -22,6 +22,14 @@ function fmt(n: number | null) {
   return n.toLocaleString("ko-KR");
 }
 
+function LabelChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-block whitespace-nowrap text-[10.5px] font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+      {children}
+    </span>
+  );
+}
+
 function PctCell({ v, size = "base" }: { v: number | null; size?: "base" | "lg" }) {
   if (v == null) return <span className="text-slate-600">-</span>;
   const up = v > 0;
@@ -278,15 +286,18 @@ export default function WeeklyDashboard({
                   <div className="border-t border-slate-800" style={{ marginTop: "11px" }} />
 
                   {/* 3행: 왼쪽 주초→주말, 오른쪽 최고/최저+YTD */}
-                  <div className="grid grid-cols-2" style={{ gap: "12px", marginTop: "9px" }}>
-                    <div className="text-[12px] text-slate-500 font-medium tabular-nums">
-                      {weekStart.slice(5).replace("-", "/")} → {refFriday.slice(5).replace("-", "/")}<br />
-                      <span className="text-slate-300">{idx.prevClose?.toLocaleString("ko-KR")} → {idx.close?.toLocaleString("ko-KR")}</span>
+                  <div className="grid grid-cols-2 items-start" style={{ gap: "12px", marginTop: "9px" }}>
+                    <div className="flex flex-col gap-1.5">
+                      <LabelChip>{weekStart.slice(5).replace("-", "/")} → {refFriday.slice(5).replace("-", "/")}</LabelChip>
+                      <span className="text-[12px] font-medium tabular-nums text-slate-300">{idx.prevClose?.toLocaleString("ko-KR")} → {idx.close?.toLocaleString("ko-KR")}</span>
                     </div>
-                    <div className="flex flex-col pl-3 border-l border-slate-800 text-[12px] font-medium tabular-nums" style={{ gap: "4px" }}>
-                      <div className="text-slate-500">최고 <span className="text-slate-300">{idx.weekHigh?.toLocaleString("ko-KR")}</span> · 최저 <span className="text-slate-300">{idx.weekLow?.toLocaleString("ko-KR")}</span></div>
+                    <div className="flex flex-col pl-3 border-l border-slate-800 gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap text-[12px] font-medium tabular-nums">
+                        <LabelChip>최고</LabelChip><span className="text-slate-300">{idx.weekHigh?.toLocaleString("ko-KR")}</span>
+                        <LabelChip>최저</LabelChip><span className="text-slate-300">{idx.weekLow?.toLocaleString("ko-KR")}</span>
+                      </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-slate-500">YTD</span>
+                        <LabelChip>YTD</LabelChip>
                         <PctCell v={idx.retYtd} />
                       </div>
                     </div>
