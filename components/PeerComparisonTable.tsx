@@ -174,9 +174,9 @@ export default function PeerComparisonTable({
   // 헤더 라벨은 이노스페이스(항상 데이터가 있는 당사)의 그 주 실제 거래일 기준으로 표시.
   // 계산으로 구한 "월요일"이 아니라 weekChartData(실제 거래 기록)의 첫/마지막 날짜를 쓰므로,
   // 그 날이 공휴일이었다면 애초에 데이터가 없어서 자동으로 그 다음/이전 실제 거래일로 잡힘.
-  const innospaceEdges = weekEdgesByCode.get("462350");
-  const startLabel = mmddWeekday(innospaceEdges?.firstDate || weekStart);
-  const endLabel = mmddWeekday(innospaceEdges?.lastDate || refFriday);
+  const innospaceRow = rows.find((r) => r.code === "462350");
+  const startLabel = mmddWeekday(innospaceRow?.weekOpenDate || weekStart);
+  const endLabel = mmddWeekday(refFriday);
 
   const maxAbsRet = useMemo(
     () => Math.max(0.01, ...ordered.map((r) => Math.abs(r.ret1w ?? 0))),
@@ -360,9 +360,9 @@ export default function PeerComparisonTable({
                 const isOpen = expanded === r.code;
                 const localCap = fmtLocalCap(r.marketCap, isUs);
                 const edges = weekEdgesByCode.get(r.code);
-                // weekChartData가 아직 없는 회사(수집 초기 등)는 기존 prevClose/close로 대체 표시
-                const weekOpenClose = edges ? edges.firstClose : r.prevClose;
-                const weekCloseClose = edges ? edges.lastClose : r.close;
+                // 우선순위: 1) weekly_prices에 직접 저장된 실제 첫거래일 종가 2) weekly_chart_data 3) prevClose(최후 대체)
+                const weekOpenClose = r.weekOpenClose ?? (edges ? edges.firstClose : r.prevClose);
+                const weekCloseClose = r.close ?? (edges ? edges.lastClose : r.close);
 
                 return (
                   <React.Fragment key={r.code}>
