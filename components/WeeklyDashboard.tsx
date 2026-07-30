@@ -287,12 +287,12 @@ export default function WeeklyDashboard({
                   {/* 구분선 */}
                   <div className="border-t border-slate-800" style={{ marginTop: "11px" }} />
 
-                  {/* 3행: 왼쪽 주초→주말, 오른쪽 최고/최저+YTD */}
+                  {/* 3행: 왼쪽 첫거래일→마지막거래일, 오른쪽 최고/최저+YTD */}
                   <div className="grid grid-cols-2 items-start" style={{ gap: "12px", marginTop: "9px" }}>
                     <div className="flex flex-col gap-1.5">
                       <div className="flex items-center gap-2">
-                        <LabelChip>{weekStart.slice(5).replace("-", "/")}</LabelChip>
-                        <span className="text-[13px] font-bold text-slate-200 tabular-nums">{idx.prevClose?.toLocaleString("ko-KR")}</span>
+                        <LabelChip>{(idx.weekOpenDate || weekStart).slice(5).replace("-", "/")}</LabelChip>
+                        <span className="text-[13px] font-bold text-slate-200 tabular-nums">{(idx.weekOpenClose ?? idx.prevClose)?.toLocaleString("ko-KR")}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <LabelChip>{refFriday.slice(5).replace("-", "/")}</LabelChip>
