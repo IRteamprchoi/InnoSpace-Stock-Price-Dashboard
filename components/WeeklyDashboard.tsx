@@ -268,7 +268,7 @@ export default function WeeklyDashboard({
                   {/* 3행: 왼쪽 주초→주말, 오른쪽 최고/최저+YTD */}
                   <div className="grid grid-cols-2" style={{ gap: "12px", marginTop: "9px" }}>
                     <div className="text-[12px] text-slate-500 font-medium tabular-nums">
-                      주초 → 주말<br />
+                      {weekStart.slice(5).replace("-", "/")} → {refFriday.slice(5).replace("-", "/")}<br />
                       <span className="text-slate-300">{idx.prevClose?.toLocaleString("ko-KR")} → {idx.close?.toLocaleString("ko-KR")}</span>
                     </div>
                     <div className="flex flex-col pl-3 border-l border-slate-800 text-[12px] font-medium tabular-nums" style={{ gap: "4px" }}>
