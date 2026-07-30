@@ -278,16 +278,16 @@ export default function PeerComparisonTable({
         </div>
         <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5">
           <div className="text-[15px] sm:text-[16px] font-bold text-slate-200 mb-1.5">{peerSummaryLabel}</div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex items-start gap-3">
             <RetPct v={peerSummaryStat} size="xl" />
-            <div className="flex flex-col justify-center gap-1.5 pl-3 border-l border-slate-800 text-[12px] font-medium tabular-nums" style={{ color: "#8495AD" }}>
+            <div className="flex flex-col gap-1.5 pl-3 border-l border-slate-800 text-[12px] font-medium tabular-nums whitespace-nowrap" style={{ color: "#8495AD" }}>
               <span className="inline-flex items-center gap-1.5"><LabelChip>해외 평균</LabelChip><RetPct v={usAvg} /></span>
               <span className="inline-flex items-center gap-1.5"><LabelChip>국내 평균</LabelChip><RetPct v={domesticAvg} /></span>
+              <span className="inline-flex items-center gap-1.5">
+                <LabelChip>상승</LabelChip><span className="text-red-400 font-semibold">{upCount}개사</span>
+                <LabelChip>하락</LabelChip><span className="text-blue-400 font-semibold">{downCount}개사</span>
+              </span>
             </div>
-          </div>
-          <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-800 text-[12px] font-medium tabular-nums whitespace-nowrap" style={{ color: "#8495AD" }}>
-            <LabelChip>상승</LabelChip><span className="text-red-400 font-semibold">{upCount}개사</span>
-            <LabelChip>하락</LabelChip><span className="text-blue-400 font-semibold">{downCount}개사</span>
           </div>
         </div>
         <div className="bg-slate-900/70 border border-slate-700 rounded-lg px-4 sm:px-5 py-3.5 flex flex-col justify-center">
