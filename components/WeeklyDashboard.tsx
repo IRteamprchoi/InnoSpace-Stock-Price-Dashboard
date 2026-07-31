@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, Suspense } from "react";
 import { ExternalLink } from "lucide-react";
+import WeekSelector from "./WeekSelector";
 import type { WeeklyPriceRow, WeeklyNewsRow, WeeklyIntradayRow, WeeklyChartPoint } from "@/lib/sheets";
 import type { FxRate } from "@/lib/fx";
 import MiniStockChart from "./MiniStockChart";
@@ -204,6 +205,8 @@ export default function WeeklyDashboard({
   peerIntraday,
   weekChartData,
   fx,
+  availableWeeks,
+  selectedWeek,
 }: {
   prices: WeeklyPriceRow[];
   news: WeeklyNewsRow[];
@@ -211,6 +214,8 @@ export default function WeeklyDashboard({
   peerIntraday: WeeklyIntradayRow[];
   weekChartData: WeeklyChartPoint[];
   fx: FxRate | null;
+  availableWeeks: string[];
+  selectedWeek: string | null;
 }) {
   const orderedRows = useMemo(() => orderForComparison(prices), [prices]);
   const indices = useMemo(() => prices.filter((r) => r.category === "index"), [prices]);
@@ -240,6 +245,16 @@ export default function WeeklyDashboard({
 
   return (
     <div>
+      <div className="flex items-center justify-end mb-4">
+        <Suspense fallback={<div style={{ height: 34 }} />}>
+          <WeekSelector availableWeeks={availableWeeks} selectedWeek={selectedWeek} />
+        </Suspense>
+      </div>
+      {selectedWeek && availableWeeks[0] && selectedWeek !== availableWeeks[0] && (
+        <div className="mb-4 px-3 py-2 rounded-lg bg-amber-400/10 border border-amber-400/30 text-[13px] text-amber-300 font-medium">
+          지난 리포트를 보고 계십니다 ({selectedWeek} 생성분) · 최신 데이터가 아닙니다
+        </div>
+      )}
       {/* 시장 지수 주간 동향 */}
       {indices.length > 0 && (
         <div className="mb-6">
