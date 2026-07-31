@@ -2,13 +2,19 @@ import DashboardLayout from "@/components/DashboardLayout";
 import WeeklyDashboard from "@/components/WeeklyDashboard";
 import {
   getWeeklyPrices, getWeeklyNews, getIntradayData, getWeeklyIntradayPrice, getWeeklyChartData,
-  latestReportOnly, dedupeBy,
+  latestReportOnly, selectReportOnly, listAvailableReports, dedupeBy,
 } from "@/lib/sheets";
 
 // 접속할 때마다 최신 주간 데이터를 다시 가져옴
 export const dynamic = "force-dynamic";
 
-export default async function WeeklyPage() {
+export default async function WeeklyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ week?: string }>;
+}) {
+  const { week: selectedWeek } = await searchParams;
+
   const [allPrices, allNews, dailyIntraday, weeklyIntraday, allChartData] = await Promise.all([
     getWeeklyPrices(),
     getWeeklyNews(),
@@ -17,11 +23,12 @@ export default async function WeeklyPage() {
     getWeeklyChartData(),     // 종목별 그 주 실제 거래일별 시가/고가/저가/종가 (공휴일은 애초에 데이터가 없음)
   ]);
 
-  // weekly_prices/weekly_news는 매주 계속 누적되므로, 가장 최근 리포트 한 주 분량만 표시.
-  // 혹시 같은 날 여러 번 실행되어 중복 행이 남아있어도 종목코드/기사링크 기준으로 한 번씩만 남김
-  const prices = dedupeBy(latestReportOnly(allPrices), (r) => `${r.category}:${r.code}`);
-  const news = dedupeBy(latestReportOnly(allNews), (r) => `${r.name}:${r.link}`);
-  const chartData = dedupeBy(latestReportOnly(allChartData), (r) => `${r.code}:${r.date}`);
+  // weekly_prices/weekly_news는 매주 계속 누적되므로, 기본은 최신 리포트를 보여주되
+  // ?week=2026-07-24 같은 쿼리로 지난 리포트를 선택해서 볼 수 있음 ("지난 리포트 보기")
+  const prices = dedupeBy(selectReportOnly(allPrices, selectedWeek), (r) => `${r.category}:${r.code}`);
+  const news = dedupeBy(selectReportOnly(allNews, selectedWeek), (r) => `${r.name}:${r.link}`);
+  const chartData = dedupeBy(selectReportOnly(allChartData, selectedWeek), (r) => `${r.code}:${r.date}`);
+  const availableWeeks = listAvailableReports(allPrices);
 
   // 환율은 "지금 조회한 값"이 아니라, 이 리포트가 생성될 때(그 주 월요일) 스크립트가 같이
   // 저장해둔 값을 그대로 사용 - 몇 주 지난 리포트를 봐도 그때 당시 환율이 그대로 표시되도록
@@ -41,6 +48,8 @@ export default async function WeeklyPage() {
         peerIntraday={weeklyIntraday}
         weekChartData={chartData}
         fx={fx}
+        availableWeeks={availableWeeks}
+        selectedWeek={prices[0]?.reportDate || null}
       />
     </DashboardLayout>
   );
