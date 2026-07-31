@@ -400,6 +400,22 @@ export function latestReportOnly<T extends { reportDate: string }>(rows: T[]): T
   return rows.filter((r) => r.reportDate === latest);
 }
 
+// 특정 report_date(과거 리포트) 하나만 남기기 - "지난 리포트 보기" 기능용.
+// targetReportDate가 없거나 해당 리포트가 없으면 latestReportOnly와 동일하게 최신으로 대체
+export function selectReportOnly<T extends { reportDate: string }>(rows: T[], targetReportDate?: string | null): T[] {
+  if (!rows.length) return [];
+  if (targetReportDate && rows.some((r) => r.reportDate === targetReportDate)) {
+    return rows.filter((r) => r.reportDate === targetReportDate);
+  }
+  return latestReportOnly(rows);
+}
+
+// 지금까지 쌓인 리포트의 report_date 목록을 최신순으로 나열 (드롭다운용)
+export function listAvailableReports<T extends { reportDate: string }>(rows: T[]): string[] {
+  const set = new Set(rows.map((r) => r.reportDate));
+  return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
+}
+
 // 안전장치: 같은 날짜에 스크립트가 여러 번 실행되어 시트에 중복 행이 남아있어도,
 // 화면에는 종목/기사당 하나씩만 보이도록 방어적으로 중복 제거
 export function dedupeBy<T>(rows: T[], keyFn: (r: T) => string): T[] {
