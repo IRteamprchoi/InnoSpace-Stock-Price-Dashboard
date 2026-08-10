@@ -426,7 +426,9 @@ export default function PeerComparisonTable({
                             <div className="flex items-center gap-1.5"><LabelChip>1개월</LabelChip><RetPct v={r.ret1m} /></div>
                             <div className="flex items-center gap-1.5"><LabelChip>3개월</LabelChip><RetPct v={r.ret3m} /></div>
                             <div className="flex items-center gap-1.5"><LabelChip>YTD</LabelChip><RetPct v={r.retYtd} /></div>
-                            <div className="flex items-center gap-1.5"><LabelChip>1주일간 거래량</LabelChip><span className="text-slate-300 tabular-nums">{r.weekVolume != null ? r.weekVolume.toLocaleString("ko-KR") + "주" : "-"}</span></div>
+                            {r.category !== "us" && (
+                              <div className="flex items-center gap-1.5"><LabelChip>1주일간 거래량</LabelChip><span className="text-slate-300 tabular-nums">{r.weekVolume != null ? r.weekVolume.toLocaleString("ko-KR") + "주" : "-"}</span></div>
+                            )}
                             <div className="flex items-center gap-1.5"><LabelChip>등락률 순위</LabelChip><span className="text-slate-300 tabular-nums">{retRankMap.get(r.code)}위 / {ordered.length}개사</span></div>
                           </div>
                         </td>
