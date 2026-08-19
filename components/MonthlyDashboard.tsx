@@ -87,14 +87,34 @@ export default function MonthlyDashboard({
   const tableRows = useMemo(
     () =>
       COMPANY_ORDER.map((c) => {
-        const snap = buildSnapshot(priceRows, c.name, month);
+        const weeklySnap = buildSnapshot(priceRows, c.name, month);
+        const isUsCompany = c.group === "us";
+        const dailyPoints = weeklySnap
+          ? buildCompanyDailyPoints(chartRows, usHistoryRows, c.name, weeklySnap.code, isUsCompany, month)
+          : [];
+        // 실제 일별 데이터가 있으면 그걸로 월초/월말/최고/최저/등락률을 다시 계산 (더 정확함).
+        // 주간 리포트 스냅샷은 marketCap/shares/거래량 등 일별 데이터에 없는 값만 보완적으로 사용.
+        const snap =
+          weeklySnap && dailyPoints.length >= 2
+            ? {
+                ...weeklySnap,
+                openClose: dailyPoints[0].value,
+                closeClose: dailyPoints[dailyPoints.length - 1].value,
+                changePct:
+                  dailyPoints[0].value !== 0
+                    ? ((dailyPoints[dailyPoints.length - 1].value - dailyPoints[0].value) / dailyPoints[0].value) * 100
+                    : null,
+                monthHigh: Math.max(...dailyPoints.map((p) => p.value)),
+                monthLow: Math.min(...dailyPoints.map((p) => p.value)),
+              }
+            : weeklySnap;
         const flow =
           c.group !== "us" && snap?.code
             ? buildFlowSummary(investorFlowRows, snap.code, month)
             : null;
         return { ...c, snap, flow };
       }),
-    [priceRows, investorFlowRows, month]
+    [priceRows, investorFlowRows, chartRows, usHistoryRows, month]
   );
 
   const selfRow = tableRows.find((r) => r.group === "self");
@@ -998,15 +1018,22 @@ function buildCompanyDailyPoints(
 ): ChartPoint[] {
   if (isUs) {
     const symbol = US_SYMBOL_MAP[name];
-    return usHistoryRows
+    const byDateUs = new Map<string, number>();
+    usHistoryRows
       .filter((r) => r.symbol === symbol && r.date.startsWith(month))
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map((r) => ({ date: r.date, value: r.close }));
+      .forEach((r) => byDateUs.set(r.date, r.close));
+    return Array.from(byDateUs.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, value]) => ({ date, value }));
   }
-  return chartRows
+  // 동일 날짜가 여러 report_date에 중복 저장될 수 있어(재실행 등), 날짜별로 1건만 사용
+  const byDate = new Map<string, number>();
+  chartRows
     .filter((r) => r.code === code && r.date.startsWith(month))
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .map((r) => ({ date: r.date, value: r.close }));
+    .forEach((r) => byDate.set(r.date, r.close));
+  return Array.from(byDate.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, value]) => ({ date, value }));
 }
 
 function buildSegments(points: ChartPoint[]) {
