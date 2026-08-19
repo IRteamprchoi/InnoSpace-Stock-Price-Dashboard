@@ -1,5 +1,4 @@
-// ===== app/monthly/page.tsx 전체 교체 =====
-
+import DashboardLayout from "@/components/DashboardLayout";
 import MonthlyDashboard from "@/components/MonthlyDashboard";
 import {
   getIndexDailyHistory,
@@ -25,13 +24,15 @@ export default async function MonthlyPage({
   ]);
 
   return (
-    <MonthlyDashboard
-      month={month}
-      indexRows={indexRows}
-      marketNewsRows={marketNewsRows}
-      priceRows={priceRows}
-      companyNewsRows={companyNewsRows}
-      investorFlowRows={investorFlowRows}
-    />
+    <DashboardLayout title="이노스페이스 월간 주가 및 매매 동향">
+      <MonthlyDashboard
+        month={month}
+        indexRows={indexRows}
+        marketNewsRows={marketNewsRows}
+        priceRows={priceRows}
+        companyNewsRows={companyNewsRows}
+        investorFlowRows={investorFlowRows}
+      />
+    </DashboardLayout>
   );
 }
