@@ -3,12 +3,23 @@
 import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
+import {
+  ComposedChart,
+  Line,
+  XAxis,
+  YAxis,
+  ReferenceLine,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import type {
   IndexDailyRow,
   MarketNewsMonthlyRow,
   WeeklyPriceRow,
   WeeklyNewsRow,
   DomesticInvestorFlowRow,
+  WeeklyChartPoint,
+  UsStockHistoryRow,
 } from "@/lib/sheets";
 
 type Group = "us" | "self" | "domestic";
@@ -41,6 +52,8 @@ type MonthlyDashboardProps = {
   priceRows: WeeklyPriceRow[];
   companyNewsRows: WeeklyNewsRow[];
   investorFlowRows: DomesticInvestorFlowRow[];
+  chartRows: WeeklyChartPoint[];
+  usHistoryRows: UsStockHistoryRow[];
 };
 
 export default function MonthlyDashboard({
@@ -50,6 +63,8 @@ export default function MonthlyDashboard({
   priceRows,
   companyNewsRows,
   investorFlowRows,
+  chartRows,
+  usHistoryRows,
 }: MonthlyDashboardProps) {
   const monthLabel = `${month.slice(0, 4)}년 ${Number(month.slice(5, 7))}월`;
   const isCurrentMonth = month === new Date().toISOString().slice(0, 7);
@@ -179,13 +194,21 @@ export default function MonthlyDashboard({
           <IndexCard title="코스피" rows={kospiRows} />
           <IndexCard title="코스닥" rows={kosdaqRows} />
         </div>
-        <CompareChart kospi={kospiRows} kosdaq={kosdaqRows} />
+        <DailyCompareChart
+          kospi={kospiRows.map((r) => ({ date: r.date, value: r.close }))}
+          kosdaq={kosdaqRows.map((r) => ({ date: r.date, value: r.close }))}
+        />
       </section>
 
       {/* D. 18개사 월간 현황 */}
       <section className="space-y-3">
         <SectionTitle>II. 이노스페이스 및 피어그룹 월간 현황</SectionTitle>
-        <PeerMonthlyTable rows={tableRows} month={month} companyNewsRows={companyNewsRows} />
+        <PeerMonthlyTable
+          rows={tableRows}
+          month={month}
+          chartRows={chartRows}
+          usHistoryRows={usHistoryRows}
+        />
         {latestFx && (
           <p className="text-[10px] text-slate-500">
             해외 종목 원화 환산 적용 환율: 1 USD = {Math.round(latestFx.fxRate as number).toLocaleString("ko-KR")}원
@@ -493,7 +516,12 @@ function IndexCard({ title, rows }: { title: string; rows: IndexDailyRow[] }) {
           <p className="tabular-nums text-slate-200">{low?.toLocaleString("ko-KR")}</p>
         </div>
       </div>
-      <Sparkline rows={sorted} />
+      <DailyPriceChart
+        points={sorted.map((r) => ({ date: r.date, value: r.close }))}
+        isUs={false}
+        showHeader={false}
+        height={130}
+      />
     </div>
   );
 }
@@ -589,11 +617,13 @@ function badgeStyle(g: Group): string {
 function PeerMonthlyTable({
   rows,
   month,
-  companyNewsRows,
+  chartRows,
+  usHistoryRows,
 }: {
   rows: TableRowData[];
   month: string;
-  companyNewsRows: WeeklyNewsRow[];
+  chartRows: WeeklyChartPoint[];
+  usHistoryRows: UsStockHistoryRow[];
 }) {
   const [expandedName, setExpandedName] = useState<string | null>(null);
 
@@ -677,7 +707,9 @@ function PeerMonthlyTable({
                         <CompanyDetail
                           row={r}
                           isUs={isUs}
-                          companyNewsRows={companyNewsRows}
+                          month={month}
+                          chartRows={chartRows}
+                          usHistoryRows={usHistoryRows}
                         />
                       </td>
                     </tr>
@@ -688,6 +720,25 @@ function PeerMonthlyTable({
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function MiniStatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2">
+      <p className="text-[10px] text-slate-500">{label}</p>
+      <p className="text-[14px] font-semibold text-slate-200 tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+function FlowStatCard({ label, value }: { label: string; value: number }) {
+  const color = value > 0 ? "text-red-400" : value < 0 ? "text-blue-400" : "text-slate-400";
+  return (
+    <div className="bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2">
+      <p className="text-[10px] text-slate-500">{label}</p>
+      <p className={`text-[14px] font-semibold tabular-nums ${color}`}>{fmtFlow(value)}</p>
     </div>
   );
 }
@@ -728,11 +779,15 @@ function WeeklyMiniChart({ closes, up }: { closes: number[]; up: boolean }) {
 function CompanyDetail({
   row,
   isUs,
-  companyNewsRows,
+  month,
+  chartRows,
+  usHistoryRows,
 }: {
   row: TableRowData;
   isUs: boolean;
-  companyNewsRows: WeeklyNewsRow[];
+  month: string;
+  chartRows: WeeklyChartPoint[];
+  usHistoryRows: UsStockHistoryRow[];
 }) {
   const snap = row.snap;
   const flow = row.flow;
@@ -741,68 +796,97 @@ function CompanyDetail({
     return <p className="text-[12px] text-slate-500">이번 달 수집된 데이터가 없습니다.</p>;
   }
 
-  const recentNews = companyNewsRows
-    .filter((n) => n.name === row.name)
-    .sort((a, b) => b.pubDate.localeCompare(a.pubDate))
-    .slice(0, 2);
+  const dailyPoints = buildCompanyDailyPoints(chartRows, usHistoryRows, row.name, snap.code, isUs, month);
+  const marketCapPctChange =
+    snap.openMarketCap != null && snap.openMarketCap !== 0 && snap.marketCapChange != null
+      ? (snap.marketCapChange / snap.openMarketCap) * 100
+      : null;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <DetailItem
-          label="발행주식수"
-          value={snap.shares != null ? Math.round(snap.shares).toLocaleString("ko-KR") + "주" : "-"}
-        />
-        <DetailItem label="월초 시가총액" value={fmtMarketCapKrw(snap.openMarketCap)} />
-        <DetailItem label="월말 시가총액" value={fmtMarketCapKrw(snap.closeMarketCap)} />
-        <DetailItem
-          label="시가총액 증감"
-          value={
-            snap.marketCapChange != null
-              ? `${snap.marketCapChange >= 0 ? "+" : "-"}${fmtMarketCapKrw(Math.abs(snap.marketCapChange))}`
-              : "-"
-          }
-          tone={toneOf(snap.marketCapChange)}
-        />
-        <DetailItem label="월중 최고가" value={fmtPrice(snap.monthHigh, isUs)} />
-        <DetailItem label="월중 최저가" value={fmtPrice(snap.monthLow, isUs)} />
-        <DetailItem label="집계 리포트 수" value={`${snap.weeksCount}회`} />
-        <DetailItem label="개인 순매수" value={isUs ? "N/A" : fmtFlow(flow?.individual)} />
-        <DetailItem label="외국인 순매수" value={isUs ? "N/A" : fmtFlow(flow?.foreign)} />
-        <DetailItem label="기관 순매수" value={isUs ? "N/A" : fmtFlow(flow?.institution)} />
-        <DetailItem label="기타 순매수" value={isUs ? "N/A" : fmtFlow(flow?.otherTotal)} />
-        <DetailItem label="월간 거래량" value={isUs ? "N/A" : fmtVolume(snap.monthVolume)} />
-      </div>
+      {/* A. 주식 및 거래정보 */}
       <div>
-        <p className="text-[11px] text-slate-500 mb-1">
-          주간 종가 추이 ({snap.weeksCount}개 주간 리포트 기준)
-        </p>
-        <WeeklyMiniChart closes={snap.weeklyCloses} up={(snap.changePct ?? 0) >= 0} />
+        <p className="text-[10px] text-slate-500 mb-1.5">주식 및 거래정보</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <MiniStatCard
+            label="발행주식수"
+            value={snap.shares != null ? Math.round(snap.shares).toLocaleString("ko-KR") + "주" : "-"}
+          />
+          <MiniStatCard label="월간 거래량" value={isUs ? "N/A" : fmtVolume(snap.monthVolume)} />
+          <MiniStatCard label="월중 최고가" value={fmtPrice(snap.monthHigh, isUs)} />
+          <MiniStatCard label="월중 최저가" value={fmtPrice(snap.monthLow, isUs)} />
+        </div>
       </div>
-      {recentNews.length > 0 && (
-        <div>
-          <p className="text-[11px] text-slate-500 mb-1">최근 관련 기사</p>
-          <div className="space-y-1">
-            {recentNews.map((n) => (
-              <a
-                key={n.link}
-                href={n.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-[12px] text-slate-300 hover:text-amber-300 hover:underline"
+
+      {/* B. 시가총액 변화 */}
+      <div>
+        <p className="text-[10px] text-slate-500 mb-1.5">시가총액 변화</p>
+        <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div>
+              <p className="text-[10px] text-slate-500">월초</p>
+              <p className="text-[14px] font-semibold text-slate-200 tabular-nums">
+                {fmtMarketCapKrw(snap.openMarketCap)}
+              </p>
+            </div>
+            <span className="text-slate-600">→</span>
+            <div>
+              <p className="text-[10px] text-slate-500">월말</p>
+              <p className="text-[14px] font-semibold text-slate-200 tabular-nums">
+                {fmtMarketCapKrw(snap.closeMarketCap)}
+              </p>
+            </div>
+            <div className="ml-auto text-right">
+              <p className="text-[10px] text-slate-500">증감</p>
+              <p
+                className={`text-[14px] font-semibold tabular-nums ${
+                  toneOf(snap.marketCapChange) === "up"
+                    ? "text-red-400"
+                    : toneOf(snap.marketCapChange) === "down"
+                    ? "text-blue-400"
+                    : "text-slate-400"
+                }`}
               >
-                {n.title} <span className="text-slate-500">· {n.source}</span>
-              </a>
-            ))}
+                {snap.marketCapChange != null
+                  ? `${snap.marketCapChange >= 0 ? "+" : "-"}${fmtMarketCapKrw(Math.abs(snap.marketCapChange))}`
+                  : "-"}
+                {marketCapPctChange != null && (
+                  <span className="text-[11px] font-normal ml-1">
+                    ({marketCapPctChange >= 0 ? "+" : ""}
+                    {marketCapPctChange.toFixed(2)}%)
+                  </span>
+                )}
+              </p>
+            </div>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* C. 투자자별 누적 순매수 */}
+      <div>
+        <p className="text-[10px] text-slate-500 mb-1.5">투자자별 누적 순매수</p>
+        {isUs || !flow ? (
+          <p className="text-[12px] text-slate-500 bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2">
+            해당 종목은 투자자별 매매동향 데이터가 제공되지 않습니다.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <FlowStatCard label="개인" value={flow.individual} />
+            <FlowStatCard label="외국인" value={flow.foreign} />
+            <FlowStatCard label="기관" value={flow.institution} />
+            <FlowStatCard label="기타" value={flow.otherTotal} />
+          </div>
+        )}
+      </div>
+
+      {/* 월간 주가 추이 */}
+      <div>
+        <p className="text-[10px] text-slate-500 mb-1.5">월간 주가 추이</p>
+        <DailyPriceChart points={dailyPoints} isUs={isUs} height={160} />
+      </div>
     </div>
   );
 }
-
-// ---------- III장: 뉴스 아코디언 ----------
-
 function Accordion({
   title,
   count,
@@ -887,5 +971,268 @@ function NewsRow({ item }: { item: NewsItemLike }) {
 function EmptyNews() {
   return (
     <p className="px-4 py-6 text-center text-[12px] text-slate-500">이번 달 수집된 기사가 없습니다.</p>
+  );
+}
+
+// ---------- 일별 데이터 기반 공용 차트 (weekly 페이지와 동일한 구간별 색상 방식) ----------
+
+type ChartPoint = { date: string; value: number };
+
+const CHART_UP = "#f87171";
+const CHART_DOWN = "#60a5fa";
+const CHART_FLAT = "#94a3b8";
+
+const US_SYMBOL_MAP: Record<string, string> = {
+  "Space X": "SPCX",
+  "Rocket Lab": "RKLB",
+  "Firefly Aerospace": "FLY",
+};
+
+function buildCompanyDailyPoints(
+  chartRows: WeeklyChartPoint[],
+  usHistoryRows: UsStockHistoryRow[],
+  name: string,
+  code: string,
+  isUs: boolean,
+  month: string
+): ChartPoint[] {
+  if (isUs) {
+    const symbol = US_SYMBOL_MAP[name];
+    return usHistoryRows
+      .filter((r) => r.symbol === symbol && r.date.startsWith(month))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((r) => ({ date: r.date, value: r.close }));
+  }
+  return chartRows
+    .filter((r) => r.code === code && r.date.startsWith(month))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((r) => ({ date: r.date, value: r.close }));
+}
+
+function buildSegments(points: ChartPoint[]) {
+  const rows: Record<string, number | string>[] = points.map((p, i) => ({
+    x: i,
+    date: p.date,
+  }));
+  const segs: { key: string; color: string }[] = [];
+  for (let i = 1; i < points.length; i++) {
+    const key = `seg${i}`;
+    const up = points[i].value > points[i - 1].value;
+    const flat = points[i].value === points[i - 1].value;
+    rows[i - 1][key] = points[i - 1].value;
+    rows[i][key] = points[i].value;
+    segs.push({ key, color: flat ? CHART_FLAT : up ? CHART_UP : CHART_DOWN });
+  }
+  return { rows, segs };
+}
+
+function DailyPriceChart({
+  points,
+  isUs,
+  height = 170,
+  showHeader = true,
+}: {
+  points: ChartPoint[];
+  isUs: boolean;
+  height?: number;
+  showHeader?: boolean;
+}) {
+  const { rows, segs } = useMemo(() => buildSegments(points), [points]);
+
+  if (points.length < 2) {
+    return <p className="text-[11px] text-slate-600 py-4">이번 달 수집된 일별 데이터가 부족합니다.</p>;
+  }
+
+  const closes = points.map((p) => p.value);
+  const changePct = ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100;
+  const high = Math.max(...closes);
+  const low = Math.min(...closes);
+  const latest = closes[closes.length - 1];
+
+  const tickCount = Math.min(6, rows.length);
+  const step = Math.max(1, Math.floor((rows.length - 1) / Math.max(tickCount - 1, 1)));
+  const dayTicks = rows.filter((_, i) => i % step === 0 || i === rows.length - 1).map((r) => r.x as number);
+
+  return (
+    <div>
+      {showHeader && (
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+          <RetPct v={changePct} />
+          <div className="flex gap-3 text-[11px] text-slate-400">
+            <span>
+              최고 <span className="text-slate-200 tabular-nums">{fmtPrice(high, isUs)}</span>
+            </span>
+            <span>
+              최신 <span className="text-slate-200 tabular-nums">{fmtPrice(latest, isUs)}</span>
+            </span>
+            <span>
+              최저 <span className="text-slate-200 tabular-nums">{fmtPrice(low, isUs)}</span>
+            </span>
+          </div>
+        </div>
+      )}
+      <ResponsiveContainer width="100%" height={height}>
+        <ComposedChart data={rows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <XAxis
+            dataKey="x"
+            type="number"
+            domain={[0, rows.length - 1]}
+            ticks={dayTicks}
+            tickFormatter={(x: number) => (rows[x] ? String(rows[x].date).slice(5).replace("-", "/") : "")}
+            tick={{ fontSize: 10, fill: "#64748b" }}
+            axisLine={{ stroke: "#334155" }}
+            tickLine={false}
+          />
+          <YAxis domain={["dataMin", "dataMax"]} hide />
+          <Tooltip content={<DailyChartTooltip points={points} isUs={isUs} />} />
+          {segs.map((s) => (
+            <Line
+              key={s.key}
+              type="linear"
+              dataKey={s.key}
+              stroke={s.color}
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              dot={false}
+              connectNulls={false}
+              isAnimationActive={false}
+              activeDot={{ r: 3, fill: s.color, strokeWidth: 0 }}
+            />
+          ))}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function DailyChartTooltip({ active, payload, points, isUs }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const x = payload[0]?.payload?.x;
+  if (x == null || !points[x]) return null;
+  const point = points[x];
+  const prev = points[x - 1];
+  const chg = prev ? point.value - prev.value : null;
+  const chgPct = prev && prev.value !== 0 ? ((chg as number) / prev.value) * 100 : null;
+  const cumPct = points[0].value !== 0 ? ((point.value - points[0].value) / points[0].value) * 100 : 0;
+  return (
+    <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[11px] space-y-0.5 shadow-lg">
+      <p className="text-slate-300 font-medium">{point.date}</p>
+      <p className="text-slate-200">종가 {fmtPrice(point.value, isUs)}</p>
+      {chg != null && (
+        <p className={chg > 0 ? "text-red-400" : chg < 0 ? "text-blue-400" : "text-slate-400"}>
+          전일대비 {chg > 0 ? "+" : ""}
+          {fmtPrice(Math.abs(chg), isUs)} ({(chgPct as number) >= 0 ? "+" : ""}
+          {(chgPct as number).toFixed(2)}%)
+        </p>
+      )}
+      <p className="text-slate-500">
+        월초 대비 {cumPct >= 0 ? "+" : ""}
+        {cumPct.toFixed(2)}%
+      </p>
+    </div>
+  );
+}
+
+function DailyCompareChart({ kospi, kosdaq }: { kospi: ChartPoint[]; kosdaq: ChartPoint[] }) {
+  const merged = useMemo(() => {
+    const map = new Map<string, { date: string; kospi?: number; kosdaq?: number }>();
+    const baseK = kospi[0]?.value;
+    const baseD = kosdaq[0]?.value;
+    kospi.forEach((p) => {
+      const pct = baseK ? ((p.value - baseK) / baseK) * 100 : 0;
+      map.set(p.date, { ...(map.get(p.date) ?? { date: p.date }), date: p.date, kospi: pct });
+    });
+    kosdaq.forEach((p) => {
+      const pct = baseD ? ((p.value - baseD) / baseD) * 100 : 0;
+      map.set(p.date, { ...(map.get(p.date) ?? { date: p.date }), date: p.date, kosdaq: pct });
+    });
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [kospi, kosdaq]);
+
+  if (merged.length < 2) {
+    return (
+      <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4 text-[12px] text-slate-500">
+        비교할 데이터가 충분하지 않습니다.
+      </div>
+    );
+  }
+
+  const tickCount = Math.min(6, merged.length);
+  const step = Math.max(1, Math.floor((merged.length - 1) / Math.max(tickCount - 1, 1)));
+  const dayTicks = merged.filter((_, i) => i % step === 0 || i === merged.length - 1).map((r) => r.date);
+
+  return (
+    <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-[13px] font-semibold text-slate-200">코스피/코스닥 월간 누적 등락률 비교</h3>
+        <div className="flex gap-3 text-[11px]">
+          <span className="text-red-400">● 코스피</span>
+          <span className="text-blue-400">● 코스닥</span>
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={180}>
+        <ComposedChart data={merged} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <XAxis
+            dataKey="date"
+            ticks={dayTicks}
+            tickFormatter={(d: string) => d.slice(5).replace("-", "/")}
+            tick={{ fontSize: 10, fill: "#64748b" }}
+            axisLine={{ stroke: "#334155" }}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fontSize: 10, fill: "#64748b" }}
+            tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+            axisLine={false}
+            tickLine={false}
+            width={36}
+          />
+          <ReferenceLine y={0} stroke="#475569" strokeDasharray="4 4" />
+          <Tooltip content={<CompareTooltip />} />
+          <Line
+            type="linear"
+            dataKey="kospi"
+            stroke="#f87171"
+            strokeWidth={2}
+            dot={false}
+            connectNulls
+            isAnimationActive={false}
+          />
+          <Line
+            type="linear"
+            dataKey="kosdaq"
+            stroke="#60a5fa"
+            strokeWidth={2}
+            dot={false}
+            connectNulls
+            isAnimationActive={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+      <p className="text-[10px] text-slate-500 mt-1">월초 종가를 0%로 정규화한 누적 등락률 기준</p>
+    </div>
+  );
+}
+
+function CompareTooltip({ active, payload, label }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const kospi = payload.find((p: any) => p.dataKey === "kospi");
+  const kosdaq = payload.find((p: any) => p.dataKey === "kosdaq");
+  return (
+    <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-[11px] space-y-0.5 shadow-lg">
+      <p className="text-slate-300 font-medium">{label}</p>
+      {kospi && (
+        <p className="text-red-400">
+          코스피 {kospi.value >= 0 ? "+" : ""}
+          {kospi.value.toFixed(2)}%
+        </p>
+      )}
+      {kosdaq && (
+        <p className="text-blue-400">
+          코스닥 {kosdaq.value >= 0 ? "+" : ""}
+          {kosdaq.value.toFixed(2)}%
+        </p>
+      )}
+    </div>
   );
 }
