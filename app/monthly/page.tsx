@@ -6,6 +6,8 @@ import {
   getWeeklyPrices,
   getWeeklyNews,
   getDomesticInvestorFlow,
+  getWeeklyChartData,
+  getUsStockHistory,
 } from "@/lib/sheets";
 
 export default async function MonthlyPage({
@@ -15,12 +17,22 @@ export default async function MonthlyPage({
 }) {
   const month = searchParams.month ?? new Date().toISOString().slice(0, 7);
 
-  const [indexRows, marketNewsRows, priceRows, companyNewsRows, investorFlowRows] = await Promise.all([
+  const [
+    indexRows,
+    marketNewsRows,
+    priceRows,
+    companyNewsRows,
+    investorFlowRows,
+    chartRows,
+    usHistoryRows,
+  ] = await Promise.all([
     getIndexDailyHistory(),
     getMarketNewsMonthly(),
     getWeeklyPrices(),
     getWeeklyNews(),
     getDomesticInvestorFlow(),
+    getWeeklyChartData(),
+    getUsStockHistory(),
   ]);
 
   return (
@@ -32,6 +44,8 @@ export default async function MonthlyPage({
         priceRows={priceRows}
         companyNewsRows={companyNewsRows}
         investorFlowRows={investorFlowRows}
+        chartRows={chartRows}
+        usHistoryRows={usHistoryRows}
       />
     </DashboardLayout>
   );
