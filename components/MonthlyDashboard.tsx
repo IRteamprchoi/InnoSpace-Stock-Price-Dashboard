@@ -685,8 +685,8 @@ function PeerMonthlyTable({
   );
 }
 
-function DetailItem({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" }) {
-  const color = tone === "up" ? "text-red-400" : tone === "down" ? "text-blue-400" : "text-slate-200";
+function DetailItem({ label, value, tone }: { label: string; value: string; tone?: "up" | "down" | "flat" }) {
+  const color = tone === "up" ? "text-red-400" : tone === "down" ? "text-blue-400" : tone === "flat" ? "text-slate-400" : "text-slate-200";
   return (
     <div>
       <p className="text-[10px] text-slate-500">{label}</p>
