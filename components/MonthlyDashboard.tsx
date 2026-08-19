@@ -260,16 +260,23 @@ function buildSnapshot(rows: WeeklyPriceRow[], name: string, month: string): Com
     first.close != null && last.close != null && first.close !== 0
       ? ((last.close - first.close) / first.close) * 100
       : null;
+  // market_cap 필드는 해외 종목의 경우 원화가 아닌 달러(USD) 원값으로 저장되어 있어,
+  // 원화 표시를 위해서는 그 시점의 환율(fxRate)을 곱해 변환해야 합니다.
+  const isUsRow = last.category === "us";
+  const toKrw = (v: number | null, fxRate: number | null) =>
+    v == null ? null : isUsRow && fxRate != null ? v * fxRate : v;
+  const openMarketCapKrw = toKrw(first.marketCap, first.fxRate);
+  const closeMarketCapKrw = toKrw(last.marketCap, last.fxRate);
   const marketCapChange =
-    first.marketCap != null && last.marketCap != null ? last.marketCap - first.marketCap : null;
+    openMarketCapKrw != null && closeMarketCapKrw != null ? closeMarketCapKrw - openMarketCapKrw : null;
   return {
     category: last.category,
     code: last.code,
     openClose: first.close,
     closeClose: last.close,
     changePct,
-    openMarketCap: first.marketCap,
-    closeMarketCap: last.marketCap,
+    openMarketCap: openMarketCapKrw,
+    closeMarketCap: closeMarketCapKrw,
     marketCapChange,
     shares: last.shares,
     monthVolume,
