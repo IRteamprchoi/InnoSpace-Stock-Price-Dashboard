@@ -430,3 +430,137 @@ export function dedupeBy<T>(rows: T[], keyFn: (r: T) => string): T[] {
   });
   return out;
 }
+
+// ===== 아래 내용을 lib/sheets.ts 맨 끝에 그대로 붙여넣으세요 =====
+// (parseCsv, fetchCsvText, num 은 파일에 이미 있는 걸 그대로 재사용합니다 - 새로 안 만들어도 됩니다)
+
+// ---------- 지수 일별 이력 (index_daily_history) ----------
+export type IndexDailyRow = {
+  date: string; // 거래일 YYYY-MM-DD
+  code: string; // 종목코드 (1=코스피, 1001=코스닥)
+  name: string; // 지수명
+  close: number;
+  high: number;
+  low: number;
+  changePct: number; // 등락률(%)
+};
+
+export async function getIndexDailyHistory(): Promise<IndexDailyRow[]> {
+  const url = process.env.INDEX_DAILY_CSV_URL;
+  if (!url) {
+    console.warn("INDEX_DAILY_CSV_URL 환경변수가 설정되지 않았습니다.");
+    return [];
+  }
+
+  const text = await fetchCsvText(url);
+  if (text === null) {
+    console.error("지수 일별 이력 조회 실패");
+    return [];
+  }
+  const rows = parseCsv(text);
+  const [, ...dataRows] = rows;
+
+  return dataRows.map((r) => ({
+    date: r[0],
+    code: r[1],
+    name: r[2],
+    close: num(r[3]),
+    high: num(r[4]),
+    low: num(r[5]),
+    changePct: num(r[6]),
+  }));
+}
+
+// ---------- 국내 투자자매매동향 (domestic_investor_flow) ----------
+export type DomesticInvestorFlowRow = {
+  date: string; // 거래일 YYYY-MM-DD
+  code: string; // 종목코드
+  name: string; // 기업명
+  individual: number; // 개인
+  foreign: number; // 외국인
+  institution: number; // 기관계
+  financial: number; // 금융투자
+  insurance: number; // 보험
+  investment: number; // 투신
+  bank: number; // 은행
+  otherFinance: number; // 기타금융
+  pension: number; // 연기금등
+  privateFund: number; // 사모펀드
+  otherCorp: number; // 기타법인
+  otherForeign: number; // 기타외국인
+  otherTotal: number; // 기타합계
+};
+
+export async function getDomesticInvestorFlow(): Promise<DomesticInvestorFlowRow[]> {
+  const url = process.env.DOMESTIC_INVESTOR_FLOW_CSV_URL;
+  if (!url) {
+    console.warn("DOMESTIC_INVESTOR_FLOW_CSV_URL 환경변수가 설정되지 않았습니다.");
+    return [];
+  }
+
+  const text = await fetchCsvText(url);
+  if (text === null) {
+    console.error("국내 투자자매매동향 조회 실패");
+    return [];
+  }
+  const rows = parseCsv(text);
+  const [, ...dataRows] = rows;
+
+  return dataRows.map((r) => ({
+    date: r[0],
+    code: r[1],
+    name: r[2],
+    individual: num(r[3]),
+    foreign: num(r[4]),
+    institution: num(r[5]),
+    financial: num(r[6]),
+    insurance: num(r[7]),
+    investment: num(r[8]),
+    bank: num(r[9]),
+    otherFinance: num(r[10]),
+    pension: num(r[11]),
+    privateFund: num(r[12]),
+    otherCorp: num(r[13]),
+    otherForeign: num(r[14]),
+    otherTotal: num(r[15]),
+  }));
+}
+
+// ---------- 시장 시황 뉴스 (market_news_weekly, 월간 화면에서 재사용) ----------
+export type MarketNewsMonthlyRow = {
+  reportDate: string; // 해당 주차의 리포트 기준일
+  market: "KR" | "US";
+  title: string;
+  source: string;
+  pubDate: string;
+  link: string;
+  outletCount: number;
+  commentary: string; // AI 생성 해설 (없으면 빈 문자열)
+};
+
+export async function getMarketNewsMonthly(): Promise<MarketNewsMonthlyRow[]> {
+  const url = process.env.MARKET_NEWS_CSV_URL;
+  if (!url) {
+    console.warn("MARKET_NEWS_CSV_URL 환경변수가 설정되지 않았습니다.");
+    return [];
+  }
+
+  const text = await fetchCsvText(url);
+  if (text === null) {
+    console.error("시장 시황 뉴스 조회 실패");
+    return [];
+  }
+  const rows = parseCsv(text);
+  const [, ...dataRows] = rows;
+
+  return dataRows.map((r) => ({
+    reportDate: r[0],
+    market: (r[1] === "US" ? "US" : "KR") as "KR" | "US",
+    title: r[2],
+    source: r[3],
+    pubDate: r[4],
+    link: r[5],
+    outletCount: num(r[6]),
+    commentary: r[7] ?? "",
+  }));
+}
