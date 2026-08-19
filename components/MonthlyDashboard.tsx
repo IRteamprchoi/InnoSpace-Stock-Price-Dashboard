@@ -235,8 +235,8 @@ function SimpleDualLineChart({
   const height = 180;
   const pad = 24;
 
-  const normalize = (rows: IndexDailyRow[]) => {
-    if (rows.length === 0) return [] as string[];
+  const normalize = (rows: IndexDailyRow[]): { x: number; pct: number }[] => {
+    if (rows.length === 0) return [];
     const base = rows[0].close;
     return rows.map((r, i) => {
       const x = pad + (i / Math.max(rows.length - 1, 1)) * (width - pad * 2);
