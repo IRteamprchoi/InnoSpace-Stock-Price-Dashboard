@@ -398,8 +398,8 @@ type FlowSummary = { individual: number; foreign: number; institution: number; o
 // 이노스페이스(당사)는 domestic_investor_flow에 없고 daily_data(일간 페이지 소스)에 있음 - 종목코드가 아닌
 // 전용 시트라 별도 함수로 처리. 일간 페이지와 동일한 필드(indiv/foreign/inst/etcTotal)를 월 단위로 합산.
 function buildInnospaceFlowFromDaily(rows: DailyRow[], month: string): FlowSummary | null {
-  const monthKey = month.replace("-", "");
-  const monthRows = rows.filter((r) => r.d && r.d.startsWith(monthKey));
+  // daily_data의 일자 필드는 "2026-08-19"처럼 대시 포함 형식(월간 month와 동일 포맷)
+  const monthRows = rows.filter((r) => r.d && r.d.startsWith(month));
   if (monthRows.length === 0) return null;
   return {
     individual: monthRows.reduce((s, r) => s + (r.indiv ?? 0), 0),
