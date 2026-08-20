@@ -356,14 +356,14 @@ export default function MonthlyDashboard({
       {/* C. 시장지수 월간 동향 */}
       <section className="space-y-3">
         <SectionTitle>I. 코스피·코스닥 월간 지수 동향</SectionTitle>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           <IndexCard title="코스피" rows={kospiRows} />
           <IndexCard title="코스닥" rows={kosdaqRows} />
+          <DailyCompareChart
+            kospi={kospiRows.map((r) => ({ date: r.date, value: r.close }))}
+            kosdaq={kosdaqRows.map((r) => ({ date: r.date, value: r.close }))}
+          />
         </div>
-        <DailyCompareChart
-          kospi={kospiRows.map((r) => ({ date: r.date, value: r.close }))}
-          kosdaq={kosdaqRows.map((r) => ({ date: r.date, value: r.close }))}
-        />
       </section>
 
       {/* D. 18개사 월간 현황 */}
@@ -712,8 +712,8 @@ function IndexCard({ title, rows }: { title: string; rows: IndexDailyRow[] }) {
   }
 
   return (
-    <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-2">
+    <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-3.5">
+      <div className="flex items-center justify-between mb-1.5">
         <h3 className="text-[13px] font-semibold text-slate-200">{title}</h3>
         <RetPct v={changePct} />
       </div>
@@ -739,7 +739,7 @@ function IndexCard({ title, rows }: { title: string; rows: IndexDailyRow[] }) {
         points={sorted.map((r) => ({ date: r.date, value: r.close, high: r.high, low: r.low }))}
         isUs={false}
         showHeader={false}
-        height={130}
+        height={140}
       />
     </div>
   );
@@ -1351,41 +1351,63 @@ function DailyCompareChart({ kospi, kosdaq }: { kospi: ChartPoint[]; kosdaq: Cha
 
   if (merged.length < 2) {
     return (
-      <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4 text-[12px] text-slate-500">
+      <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-3.5 text-[12px] text-slate-500">
         비교할 데이터가 충분하지 않습니다.
       </div>
     );
   }
 
+  const lastIdx = merged.length - 1;
+  const kospiEnd = merged[lastIdx].kospi ?? 0;
+  const kosdaqEnd = merged[lastIdx].kosdaq ?? 0;
+  // 두 라벨이 너무 가까우면(값 차이가 작으면) 겹치지 않도록 상하로 밀어준다
+  const closeLabels = Math.abs(kospiEnd - kosdaqEnd) < (Math.max(...merged.map(m => Math.max(m.kospi ?? 0, m.kosdaq ?? 0))) - Math.min(...merged.map(m => Math.min(m.kospi ?? 0, m.kosdaq ?? 0)))) * 0.06;
+  const kospiDy = closeLabels ? (kospiEnd >= kosdaqEnd ? -8 : 8) : 0;
+  const kosdaqDy = closeLabels ? (kosdaqEnd > kospiEnd ? -8 : 8) : 0;
+
   const tickCount = Math.min(6, merged.length);
   const step = Math.max(1, Math.floor((merged.length - 1) / Math.max(tickCount - 1, 1)));
   const dayTicks = merged.filter((_, i) => i % step === 0 || i === merged.length - 1).map((r) => r.date);
 
+  const EndLabel = (props: any) => {
+    const { x, y, index, dataKey } = props;
+    if (index !== lastIdx) return null;
+    const val = dataKey === "kospi" ? kospiEnd : kosdaqEnd;
+    const color = val > 0 ? "#f87171" : val < 0 ? "#60a5fa" : "#94a3b8";
+    const dy = dataKey === "kospi" ? kospiDy : kosdaqDy;
+    const label = `${dataKey === "kospi" ? "코스피" : "코스닥"} ${val >= 0 ? "+" : ""}${val.toFixed(2)}%`;
+    return (
+      <text x={x + 6} y={y + dy} dy={4} fontSize={11} fontWeight={600} fill={color} textAnchor="start">
+        {label}
+      </text>
+    );
+  };
+
   return (
-    <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[13px] font-semibold text-slate-200">코스피/코스닥 월간 누적 등락률 비교</h3>
-        <div className="flex gap-3 text-[11px]">
+    <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-3.5">
+      <div className="flex items-center justify-between mb-1.5">
+        <h3 className="text-[13px] font-semibold text-slate-200">코스피/코스닥 누적 등락률</h3>
+        <div className="flex gap-2.5 text-[10px]">
           <span className="text-red-400">● 코스피</span>
           <span className="text-blue-400">● 코스닥</span>
         </div>
       </div>
-      <ResponsiveContainer width="100%" height={180}>
-        <ComposedChart data={merged} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+      <ResponsiveContainer width="100%" height={190}>
+        <ComposedChart data={merged} margin={{ top: 4, right: 58, left: 0, bottom: 0 }}>
           <XAxis
             dataKey="date"
             ticks={dayTicks}
             tickFormatter={(d: string) => d.slice(5).replace("-", "/")}
-            tick={{ fontSize: 10, fill: "#64748b" }}
+            tick={{ fontSize: 9, fill: "#64748b" }}
             axisLine={{ stroke: "#334155" }}
             tickLine={false}
           />
           <YAxis
-            tick={{ fontSize: 10, fill: "#64748b" }}
+            tick={{ fontSize: 9, fill: "#64748b" }}
             tickFormatter={(v: number) => `${v.toFixed(0)}%`}
             axisLine={false}
             tickLine={false}
-            width={36}
+            width={30}
           />
           <ReferenceLine y={0} stroke="#475569" strokeDasharray="4 4" />
           <Tooltip content={<CompareTooltip />} />
@@ -1394,7 +1416,7 @@ function DailyCompareChart({ kospi, kosdaq }: { kospi: ChartPoint[]; kosdaq: Cha
             dataKey="kospi"
             stroke="#f87171"
             strokeWidth={2}
-            dot={false}
+            dot={<EndLabel />}
             connectNulls
             isAnimationActive={false}
           />
@@ -1403,17 +1425,15 @@ function DailyCompareChart({ kospi, kosdaq }: { kospi: ChartPoint[]; kosdaq: Cha
             dataKey="kosdaq"
             stroke="#60a5fa"
             strokeWidth={2}
-            dot={false}
+            dot={<EndLabel />}
             connectNulls
             isAnimationActive={false}
           />
         </ComposedChart>
       </ResponsiveContainer>
-      <p className="text-[10px] text-slate-500 mt-1">월초 종가를 0%로 정규화한 누적 등락률 기준</p>
     </div>
   );
 }
-
 function CompareTooltip({ active, payload, label }: any) {
   if (!active || !payload || !payload.length) return null;
   const kospi = payload.find((p: any) => p.dataKey === "kospi");
