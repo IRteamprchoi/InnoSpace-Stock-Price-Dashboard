@@ -137,6 +137,79 @@ export default function MonthlyDashboard({
   const rankSorted = [...peerReturns].sort((a, b) => b.pct - a.pct);
   const selfRank = rankSorted.findIndex((p) => p.name === "이노스페이스") + 1;
 
+  // ---- 경영진 요약: A) 상대수익률 / B) 피어그룹 내 위치 / C) 기업가치 변화 / D) 수급·유동성 ----
+  const kosdaqChangePct = useMemo(() => {
+    if (kosdaqRows.length < 2) return null;
+    const first = kosdaqRows[0].close;
+    const last = kosdaqRows[kosdaqRows.length - 1].close;
+    return first ? ((last - first) / first) * 100 : null;
+  }, [kosdaqRows]);
+
+  const selfChangePct = selfRow?.snap?.changePct ?? null;
+  const excessVsKosdaq =
+    selfChangePct != null && kosdaqChangePct != null ? selfChangePct - kosdaqChangePct : null;
+  const excessVsPeerAvg = selfChangePct != null && peerAvg != null ? selfChangePct - peerAvg : null;
+
+  const upCount = peerReturns.filter((p) => p.pct > 0).length;
+  const downCount = peerReturns.filter((p) => p.pct < 0).length;
+  const topPerformer = rankSorted[0];
+  const gapToTop =
+    topPerformer && selfChangePct != null && topPerformer.name !== "이노스페이스"
+      ? topPerformer.pct - selfChangePct
+      : 0;
+
+  // 발행주식수 변동 여부 (등락률과 시가총액 증감률 괴리 확인용)
+  const sharesChanged =
+    selfRow?.snap?.shares != null &&
+    (() => {
+      const rows = priceRows
+        .filter((r) => r.name === "이노스페이스" && r.refFriday.startsWith(month))
+        .sort((a, b) => a.refFriday.localeCompare(b.refFriday));
+      if (rows.length < 2) return false;
+      return rows[0].shares !== rows[rows.length - 1].shares;
+    })();
+
+  const selfFlowD = selfRow?.flow;
+  const flowEntries = selfFlowD
+    ? [
+        { label: "개인", value: selfFlowD.individual },
+        { label: "외국인", value: selfFlowD.foreign },
+        { label: "기관", value: selfFlowD.institution },
+        { label: "기타", value: selfFlowD.otherTotal },
+      ]
+    : [];
+  const biggestBuyer = flowEntries.length
+    ? [...flowEntries].sort((a, b) => b.value - a.value)[0]
+    : null;
+  const biggestSeller = flowEntries.length
+    ? [...flowEntries].sort((a, b) => a.value - b.value)[0]
+    : null;
+  const avgDailyVolume =
+    selfRow?.snap?.monthVolume != null
+      ? Math.round(selfRow.snap.monthVolume / Math.max(selfRow.snap.weeksCount * 5, 1))
+      : null;
+  const turnoverPct =
+    selfRow?.snap?.monthVolume != null && selfRow?.snap?.shares
+      ? (selfRow.snap.monthVolume / selfRow.snap.shares) * 100
+      : null;
+
+  const execSummarySentence = (() => {
+    if (excessVsKosdaq == null || !selfRank) return null;
+    const flowNote =
+      flowEntries.length > 0
+        ? flowEntries
+            .map((f) => `${f.label}은 ${f.value > 0 ? "순매수" : f.value < 0 ? "순매도" : "보합"}`)
+            .join(", ")
+        : "";
+    return `당사는 코스닥 대비 ${excessVsKosdaq >= 0 ? "+" : ""}${excessVsKosdaq.toFixed(
+      1
+    )}%p의 초과수익률을 기록했으며 피어그룹 ${rankSorted.length}개사 중 ${selfRank}위를 기록했습니다.${
+      flowNote ? " " + flowNote + "를 보였습니다." : ""
+    }`;
+  })();
+
+
+
   const monthMarketNews = useMemo(() => {
     const filtered = marketNewsRows.filter((r) => weekBelongsToMonth(r, month));
     return dedupeByLink(filtered).sort(
@@ -205,36 +278,78 @@ export default function MonthlyDashboard({
         <MonthSelector month={month} availableMonths={availableMonths} />
       </div>
 
-      {/* B. 월간 핵심 요약 */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard
-          label="이노스페이스 월간 등락률"
-          value={pctText(selfRow?.snap?.changePct ?? null)}
-          tone={toneOf(selfRow?.snap?.changePct ?? null)}
-        />
-        <StatCard
-          label="피어그룹 평균 · 당사 순위"
-          value={pctText(peerAvg)}
-          sub={selfRank ? `${rankSorted.length}개사 중 ${selfRank}위` : undefined}
-        />
-        <StatCard
-          label="당사 시가총액 증감"
-          value={
-            selfRow?.snap?.marketCapChange != null
-              ? `${selfRow.snap.marketCapChange >= 0 ? "+" : "-"}${fmtMarketCapKrw(Math.abs(selfRow.snap.marketCapChange))}`
-              : "-"
-          }
-          tone={toneOf(selfRow?.snap?.marketCapChange ?? null)}
-        />
-        <StatCard
-          label="당사 투자자 순매수(월간)"
-          value={selfRow?.flow ? `개인 ${fmtFlow(selfRow.flow.individual)}` : "-"}
-          sub={
-            selfRow?.flow
-              ? `외국인 ${fmtFlow(selfRow.flow.foreign)} · 기관 ${fmtFlow(selfRow.flow.institution)}`
-              : undefined
-          }
-        />
+      {/* B. 경영진 요약: 상대수익률 / 피어그룹 위치 / 기업가치 / 수급·유동성 */}
+      <section className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <SummaryPanel title="당사 상대수익률">
+            <p className={`text-xl font-semibold tabular-nums ${toneColor(toneOf(selfChangePct))}`}>
+              당사 {pctText(selfChangePct)}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              코스닥 대비 {pctPointText(excessVsKosdaq)} · 피어평균 대비 {pctPointText(excessVsPeerAvg)}
+            </p>
+          </SummaryPanel>
+
+          <SummaryPanel title="피어그룹 내 위치">
+            <p className="text-xl font-semibold tabular-nums text-slate-100">
+              {rankSorted.length}개사 중 {selfRank || "-"}위
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              상승 {upCount}개사 · 하락 {downCount}개사
+              {selfRank !== 1 && topPerformer
+                ? ` · 1위(${topPerformer.name})와 ${gapToTop.toFixed(1)}%p 차이`
+                : ""}
+            </p>
+          </SummaryPanel>
+
+          <SummaryPanel title="기업가치 변화">
+            <p className="text-xl font-semibold tabular-nums text-slate-100">
+              {fmtMarketCapKrw(selfRow?.snap?.closeMarketCap ?? null)}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              {fmtMarketCapKrw(selfRow?.snap?.openMarketCap ?? null)} →{" "}
+              <span className={toneColor(toneOf(selfRow?.snap?.marketCapChange ?? null))}>
+                {selfRow?.snap?.marketCapChange != null
+                  ? `${selfRow.snap.marketCapChange >= 0 ? "+" : "-"}${fmtMarketCapKrw(
+                      Math.abs(selfRow.snap.marketCapChange)
+                    )}`
+                  : "-"}
+              </span>
+              {sharesChanged && " · 발행주식수 변동 있음"}
+            </p>
+          </SummaryPanel>
+
+          <SummaryPanel title="수급 및 유동성">
+            {flowEntries.length === 0 ? (
+              <p className="text-[13px] text-slate-500">데이터 집계 중</p>
+            ) : (
+              <>
+                <p className="text-[13px] text-slate-200">
+                  최대 순매수:{" "}
+                  <span className="text-red-400 font-medium">
+                    {biggestBuyer?.label} {fmtFlow(biggestBuyer?.value)}
+                  </span>
+                </p>
+                <p className="text-[13px] text-slate-200">
+                  최대 순매도:{" "}
+                  <span className="text-blue-400 font-medium">
+                    {biggestSeller?.label} {fmtFlow(biggestSeller?.value)}
+                  </span>
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  월간 거래량 {fmtVolume(selfRow?.snap?.monthVolume ?? null)}
+                  {avgDailyVolume != null && ` · 일평균 ${avgDailyVolume.toLocaleString("ko-KR")}주`}
+                  {turnoverPct != null && ` · 회전율 ${turnoverPct.toFixed(1)}%`}
+                </p>
+              </>
+            )}
+          </SummaryPanel>
+        </div>
+        {execSummarySentence && (
+          <p className="text-[12px] text-slate-400 bg-slate-900/40 border border-slate-800 rounded-lg px-3 py-2">
+            {execSummarySentence}
+          </p>
+        )}
       </section>
 
       {/* C. 시장지수 월간 동향 */}
@@ -501,6 +616,24 @@ function formatDate(dateStr: string): string {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="text-[15px] font-semibold border-l-4 border-amber-400 pl-3">{children}</h2>;
+}
+
+function SummaryPanel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-slate-900/70 border border-slate-700 rounded-xl px-4 py-3">
+      <p className="text-[11px] text-slate-500 mb-1.5">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function toneColor(tone: "up" | "down" | "flat" | undefined): string {
+  return tone === "up" ? "text-red-400" : tone === "down" ? "text-blue-400" : "text-slate-400";
+}
+
+function pctPointText(v: number | null): string {
+  if (v == null) return "-";
+  return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%p`;
 }
 
 function StatCard({
