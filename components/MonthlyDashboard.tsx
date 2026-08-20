@@ -68,6 +68,7 @@ export default function MonthlyDashboard({
 }: MonthlyDashboardProps) {
   const monthLabel = `${month.slice(0, 4)}년 ${Number(month.slice(5, 7))}월`;
   const isCurrentMonth = month === new Date().toISOString().slice(0, 7);
+  const [newsFilter, setNewsFilter] = useState<"전체" | "이노스페이스" | "해외 피어그룹" | "국내 피어그룹">("전체");
 
   const kospiRows = useMemo(
     () =>
@@ -156,6 +157,17 @@ export default function MonthlyDashboard({
     );
   }, [companyNewsRows, month]);
 
+  // 기업별 뉴스: 그 달의 주간 리포트에 실렸던 기사를 모아 중복 제거 + 중요도순 선별 (최대 4건)
+  const companyArticleGroups = useMemo(
+    () =>
+      COMPANY_ORDER.map((c) => ({
+        name: c.name,
+        group: c.group,
+        articles: selectTopArticles(newsInMonth(companyNewsRows, month).filter((r) => r.name === c.name)),
+      })),
+    [companyNewsRows, month]
+  );
+
   const latestFx = tableRows
     .filter((r) => r.group === "us" && r.snap?.fxRate != null)
     .map((r) => r.snap!)
@@ -237,32 +249,59 @@ export default function MonthlyDashboard({
         )}
       </section>
 
-      {/* E. 주요 공시 및 관련 기사 */}
-      <section className="space-y-3">
-        <SectionTitle>III. {monthLabel} 우주항공기업 주요 공시 및 관련 기사</SectionTitle>
-        <div className="space-y-2">
-          <Accordion title="월간 시장 시황" count={monthMarketNews.length} defaultOpen>
-            {monthMarketNews.length === 0 ? (
-              <EmptyNews />
-            ) : (
-              monthMarketNews.map((n) => <NewsRow key={n.link} item={n} />)
-            )}
-          </Accordion>
-          <Accordion title="이노스페이스" count={selfNews.length} defaultOpen>
-            {selfNews.length === 0 ? <EmptyNews /> : selfNews.map((n) => <NewsRow key={n.link} item={n} />)}
-          </Accordion>
-          <Accordion title="해외 피어그룹" count={usNews.length}>
-            {usNews.length === 0 ? <EmptyNews /> : usNews.map((n) => <NewsRow key={n.link} item={n} />)}
-          </Accordion>
-          <Accordion title="국내 피어그룹" count={domesticNews.length}>
-            {domesticNews.length === 0 ? (
-              <EmptyNews />
-            ) : (
-              domesticNews.map((n) => <NewsRow key={n.link} item={n} />)
-            )}
-          </Accordion>
+      {/* ===== III장: 우주항공기업 관련 기사 ===== */}
+      <section className="space-y-4">
+        <SectionTitle>III. {monthLabel} 우주항공기업 관련 기사</SectionTitle>
+
+        {/* A. 월간 시장 시황 */}
+        <div>
+          <h3 className="text-[13px] font-medium text-slate-300 mb-2">월간 시장 시황</h3>
+          {monthMarketNews.length === 0 ? (
+            <EmptyNews />
+          ) : (
+            <div className="rounded-xl border border-slate-700 bg-slate-900/50 divide-y divide-slate-800">
+              {monthMarketNews.slice(0, 4).map((n) => (
+                <NewsRow key={n.link} item={n} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* B. 기업별 주요 뉴스 */}
+        <div>
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <h3 className="text-[13px] font-medium text-slate-300">기업별 주요 뉴스</h3>
+            <div className="flex gap-1.5 flex-wrap">
+              {(["전체", "이노스페이스", "해외 피어그룹", "국내 피어그룹"] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setNewsFilter(f)}
+                  className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
+                    newsFilter === f
+                      ? "bg-amber-400/15 border-amber-400/40 text-amber-300"
+                      : "border-slate-700 text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {companyArticleGroups
+              .filter((g) => {
+                if (newsFilter === "전체") return true;
+                if (newsFilter === "이노스페이스") return g.group === "self";
+                if (newsFilter === "해외 피어그룹") return g.group === "us";
+                return g.group === "domestic";
+              })
+              .map((g) => (
+                <CompanyNewsCard key={g.name} group={g} tableRows={tableRows} />
+              ))}
+          </div>
         </div>
       </section>
+
     </div>
   );
 }
@@ -1259,6 +1298,102 @@ function CompareTooltip({ active, payload, label }: any) {
           코스닥 {kosdaq.value >= 0 ? "+" : ""}
           {kosdaq.value.toFixed(2)}%
         </p>
+      )}
+    </div>
+  );
+}
+
+// ---------- 기업별 뉴스 선별 (중복 제거 + 중요도 스코어링) ----------
+
+const HIGH_PRIORITY_KEYWORDS = ["수주", "계약", "발사", "시험", "실적", "투자", "증자", "IPO", "공모"];
+const MID_PRIORITY_KEYWORDS = ["사업", "전략", "협력", "파트너십", "MOU", "양해각서"];
+const RELIABLE_SOURCES = ["연합뉴스", "한국경제", "매일경제", "머니투데이", "이데일리", "전자신문", "조선비즈", "서울경제"];
+
+function normalizeTitle(title: string): string {
+  return title
+    .replace(/\[[^\]]*\]/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/[^가-힣a-zA-Z0-9]/g, "")
+    .slice(0, 22);
+}
+
+function scoreArticle(a: WeeklyNewsRow): number {
+  let score = 0;
+  if (HIGH_PRIORITY_KEYWORDS.some((k) => a.title.includes(k))) score += 30;
+  if (MID_PRIORITY_KEYWORDS.some((k) => a.title.includes(k))) score += 15;
+  if (RELIABLE_SOURCES.some((s) => a.source.includes(s))) score += 5;
+  score += Math.min(a.outletCount ?? 0, 5);
+  return score;
+}
+
+function selectTopArticles(articles: WeeklyNewsRow[]): WeeklyNewsRow[] {
+  // 1) URL 동일 제거
+  const byLink = dedupeByLink(articles);
+  // 2) 제목이 사실상 동일한 기사 제거 (정규화 후 동일하면 대표 1건만)
+  const seenTitles = new Set<string>();
+  const deduped: WeeklyNewsRow[] = [];
+  for (const a of byLink) {
+    const key = normalizeTitle(a.title);
+    if (key && seenTitles.has(key)) continue;
+    if (key) seenTitles.add(key);
+    deduped.push(a);
+  }
+  // 3) 중요도 -> 최신순 정렬 후 최대 4건
+  return deduped
+    .sort((a, b) => scoreArticle(b) - scoreArticle(a) || b.pubDate.localeCompare(a.pubDate))
+    .slice(0, 4);
+}
+
+function CompanyNewsCard({
+  group,
+  tableRows,
+}: {
+  group: { name: string; group: Group; articles: WeeklyNewsRow[] };
+  tableRows: TableRowData[];
+}) {
+  const row = tableRows.find((r) => r.name === group.name);
+  const changePct = row?.snap?.changePct ?? null;
+  const isSelf = group.group === "self";
+  const isUsGroup = group.group === "us";
+
+  return (
+    <div
+      className={`rounded-xl border bg-slate-900/50 p-3 flex flex-col ${
+        isSelf ? "border-amber-400/50" : "border-slate-700"
+      }`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <span className={`text-[10px] px-1.5 py-0.5 rounded ${badgeStyle(group.group)}`}>
+            {isSelf ? "당사" : isUsGroup ? "해외" : "국내"}
+          </span>
+          <span className="text-[13px] font-medium text-slate-100">{group.name}</span>
+        </div>
+        <RetPct v={changePct} />
+      </div>
+      {group.articles.length === 0 ? (
+        <p className="text-[11px] text-slate-500 py-3 text-center flex-1">
+          이번 달 관련 기사가 없습니다.
+        </p>
+      ) : (
+        <div className="space-y-2 flex-1">
+          {group.articles.map((a) => (
+            <a
+              key={a.link}
+              href={a.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block group"
+            >
+              <p className="text-[11px] text-slate-500 mb-0.5">
+                {formatDate(a.pubDate)} · {a.source}
+              </p>
+              <p className="text-[12.5px] text-slate-200 leading-snug line-clamp-2 group-hover:text-amber-300">
+                {a.title}
+              </p>
+            </a>
+          ))}
+        </div>
       )}
     </div>
   );
