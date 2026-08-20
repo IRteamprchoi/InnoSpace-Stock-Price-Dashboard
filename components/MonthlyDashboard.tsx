@@ -1284,17 +1284,6 @@ function DailyPriceChart({
             tickLine={false}
           />
           <YAxis domain={["dataMin", "dataMax"]} hide />
-          {points.some((p) => p.high != null) && (
-            <Area
-              type="linear"
-              dataKey="range"
-              stroke="none"
-              fill="#64748b"
-              fillOpacity={0.18}
-              isAnimationActive={false}
-              connectNulls={false}
-            />
-          )}
           <Tooltip content={<DailyChartTooltip points={points} isUs={isUs} />} />
           {segs.map((s) => (
             <Line
