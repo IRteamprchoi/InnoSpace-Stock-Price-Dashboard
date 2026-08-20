@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import {
   ComposedChart,
+  Area,
   Line,
   XAxis,
   YAxis,
@@ -735,7 +736,7 @@ function IndexCard({ title, rows }: { title: string; rows: IndexDailyRow[] }) {
         </div>
       </div>
       <DailyPriceChart
-        points={sorted.map((r) => ({ date: r.date, value: r.close }))}
+        points={sorted.map((r) => ({ date: r.date, value: r.close, high: r.high, low: r.low }))}
         isUs={false}
         showHeader={false}
         height={130}
@@ -1167,7 +1168,7 @@ function EmptyNews() {
 
 // ---------- 일별 데이터 기반 공용 차트 (weekly 페이지와 동일한 구간별 색상 방식) ----------
 
-type ChartPoint = { date: string; value: number };
+type ChartPoint = { date: string; value: number; high?: number; low?: number };
 
 const CHART_UP = "#f87171";
 const CHART_DOWN = "#60a5fa";
@@ -1198,19 +1199,20 @@ function buildCompanyDailyPoints(
       .map(([date, value]) => ({ date, value }));
   }
   // 동일 날짜가 여러 report_date에 중복 저장될 수 있어(재실행 등), 날짜별로 1건만 사용
-  const byDate = new Map<string, number>();
+  const byDate = new Map<string, { close: number; high: number; low: number }>();
   chartRows
     .filter((r) => r.code === code && r.date.startsWith(month))
-    .forEach((r) => byDate.set(r.date, r.close));
+    .forEach((r) => byDate.set(r.date, { close: r.close, high: r.high, low: r.low }));
   return Array.from(byDate.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, value]) => ({ date, value }));
+    .map(([date, v]) => ({ date, value: v.close, high: v.high, low: v.low }));
 }
 
 function buildSegments(points: ChartPoint[]) {
-  const rows: Record<string, number | string>[] = points.map((p, i) => ({
+  const rows: Record<string, number | string | number[]>[] = points.map((p, i) => ({
     x: i,
     date: p.date,
+    ...(p.high != null && p.low != null ? { range: [p.low, p.high] } : {}),
   }));
   const segs: { key: string; color: string }[] = [];
   for (let i = 1; i < points.length; i++) {
@@ -1282,6 +1284,17 @@ function DailyPriceChart({
             tickLine={false}
           />
           <YAxis domain={["dataMin", "dataMax"]} hide />
+          {points.some((p) => p.high != null) && (
+            <Area
+              type="linear"
+              dataKey="range"
+              stroke="none"
+              fill="#64748b"
+              fillOpacity={0.18}
+              isAnimationActive={false}
+              connectNulls={false}
+            />
+          )}
           <Tooltip content={<DailyChartTooltip points={points} isUs={isUs} />} />
           {segs.map((s) => (
             <Line
