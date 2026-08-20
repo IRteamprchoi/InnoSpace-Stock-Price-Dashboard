@@ -198,7 +198,7 @@ export default function MonthlyDashboard({
     const flowNote =
       flowEntries.length > 0
         ? flowEntries
-            .map((f) => `${f.label}은 ${f.value > 0 ? "순매수" : f.value < 0 ? "순매도" : "보합"}`)
+            .map((f) => `${f.label}${f.label === "기타" ? "는" : "은"} ${f.value > 0 ? "순매수" : f.value < 0 ? "순매도" : "보합"}`)
             .join(", ")
         : "";
     return `당사는 코스닥 대비 ${excessVsKosdaq >= 0 ? "+" : ""}${excessVsKosdaq.toFixed(
@@ -1021,86 +1021,73 @@ function CompanyDetail({
       : null;
 
   return (
-    <div className="space-y-4">
-      {/* A. 주식 및 거래정보 */}
-      <div>
-        <p className="text-[10px] text-slate-500 mb-1.5">주식 및 거래정보</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="flex flex-col lg:flex-row gap-4">
+      {/* 왼쪽: 컴팩트 정보 패널 (~38-40%) */}
+      <div className="lg:w-[38%] space-y-3 shrink-0">
+        <div className="grid grid-cols-2 gap-2">
           <MiniStatCard
             label="발행주식수"
             value={snap.shares != null ? Math.round(snap.shares).toLocaleString("ko-KR") + "주" : "-"}
           />
-          <MiniStatCard label="월간 거래량" value={isUs ? "N/A" : fmtVolume(snap.monthVolume)} />
           <MiniStatCard label="월중 최고가" value={fmtPrice(snap.monthHigh, isUs)} />
           <MiniStatCard label="월중 최저가" value={fmtPrice(snap.monthLow, isUs)} />
+          <MiniStatCard label="집계 기준" value={`${snap.weeksCount}개 주간 리포트`} />
         </div>
-      </div>
 
-      {/* B. 시가총액 변화 */}
-      <div>
-        <p className="text-[10px] text-slate-500 mb-1.5">시가총액 변화</p>
         <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div>
-              <p className="text-[10px] text-slate-500">월초</p>
-              <p className="text-[14px] font-semibold text-slate-200 tabular-nums">
-                {fmtMarketCapKrw(snap.openMarketCap)}
-              </p>
-            </div>
-            <span className="text-slate-600">→</span>
-            <div>
-              <p className="text-[10px] text-slate-500">월말</p>
-              <p className="text-[14px] font-semibold text-slate-200 tabular-nums">
-                {fmtMarketCapKrw(snap.closeMarketCap)}
-              </p>
-            </div>
-            <div className="ml-auto text-right">
-              <p className="text-[10px] text-slate-500">증감</p>
-              <p
-                className={`text-[14px] font-semibold tabular-nums ${
-                  toneOf(snap.marketCapChange) === "up"
-                    ? "text-red-400"
-                    : toneOf(snap.marketCapChange) === "down"
-                    ? "text-blue-400"
-                    : "text-slate-400"
-                }`}
-              >
-                {snap.marketCapChange != null
-                  ? `${snap.marketCapChange >= 0 ? "+" : "-"}${fmtMarketCapKrw(Math.abs(snap.marketCapChange))}`
-                  : "-"}
-                {marketCapPctChange != null && (
-                  <span className="text-[11px] font-normal ml-1">
-                    ({marketCapPctChange >= 0 ? "+" : ""}
-                    {marketCapPctChange.toFixed(2)}%)
-                  </span>
-                )}
-              </p>
-            </div>
+          <p className="text-[10px] text-slate-500 mb-1.5">시가총액 변화</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[13px] font-semibold text-slate-200 tabular-nums">
+              {fmtMarketCapKrw(snap.openMarketCap)}
+            </span>
+            <span className="text-slate-600 text-[12px]">→</span>
+            <span className="text-[13px] font-semibold text-slate-200 tabular-nums">
+              {fmtMarketCapKrw(snap.closeMarketCap)}
+            </span>
           </div>
+          <p
+            className={`text-[12px] font-medium tabular-nums mt-1 ${toneColor(toneOf(snap.marketCapChange))}`}
+          >
+            {snap.marketCapChange != null
+              ? `${snap.marketCapChange >= 0 ? "+" : "-"}${fmtMarketCapKrw(Math.abs(snap.marketCapChange))}`
+              : "-"}
+            {marketCapPctChange != null && (
+              <span className="font-normal ml-1">
+                ({marketCapPctChange >= 0 ? "+" : ""}
+                {marketCapPctChange.toFixed(2)}%)
+              </span>
+            )}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-[10px] text-slate-500 mb-1.5">투자자별 누적 순매수</p>
+          {isUs || !flow ? (
+            <p className="text-[11px] text-slate-500 bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2">
+              해당 종목은 투자자별 매매동향 데이터가 제공되지 않습니다.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <FlowStatCard label="개인" value={flow.individual} />
+              <FlowStatCard label="외국인" value={flow.foreign} />
+              <FlowStatCard label="기관" value={flow.institution} />
+              <FlowStatCard label="기타" value={flow.otherTotal} />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* C. 투자자별 누적 순매수 */}
-      <div>
-        <p className="text-[10px] text-slate-500 mb-1.5">투자자별 누적 순매수</p>
-        {isUs || !flow ? (
-          <p className="text-[12px] text-slate-500 bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2">
-            해당 종목은 투자자별 매매동향 데이터가 제공되지 않습니다.
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <FlowStatCard label="개인" value={flow.individual} />
-            <FlowStatCard label="외국인" value={flow.foreign} />
-            <FlowStatCard label="기관" value={flow.institution} />
-            <FlowStatCard label="기타" value={flow.otherTotal} />
-          </div>
-        )}
-      </div>
-
-      {/* 월간 주가 추이 */}
-      <div>
-        <p className="text-[10px] text-slate-500 mb-1.5">월간 주가 추이</p>
-        <DailyPriceChart points={dailyPoints} isUs={isUs} height={160} />
+      {/* 오른쪽: 월간 주가 추이 차트 (~60-62%) */}
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] text-slate-500 mb-1.5">
+          월간 주가 추이
+          {dailyPoints.length > 0 && (
+            <span className="ml-1 text-slate-600">
+              ({dailyPoints[0].date} ~ {dailyPoints[dailyPoints.length - 1].date})
+            </span>
+          )}
+        </p>
+        <DailyPriceChart points={dailyPoints} isUs={isUs} height={280} />
       </div>
     </div>
   );
