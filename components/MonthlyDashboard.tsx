@@ -20,6 +20,7 @@ import type {
   DomesticInvestorFlowRow,
   WeeklyChartPoint,
   UsStockHistoryRow,
+  DailyRow,
 } from "@/lib/sheets";
 
 type Group = "us" | "self" | "domestic";
@@ -54,6 +55,8 @@ type MonthlyDashboardProps = {
   investorFlowRows: DomesticInvestorFlowRow[];
   chartRows: WeeklyChartPoint[];
   usHistoryRows: UsStockHistoryRow[];
+  dailyRows: DailyRow[];
+  availableMonths: string[];
 };
 
 export default function MonthlyDashboard({
@@ -65,6 +68,8 @@ export default function MonthlyDashboard({
   investorFlowRows,
   chartRows,
   usHistoryRows,
+  dailyRows,
+  availableMonths,
 }: MonthlyDashboardProps) {
   const monthLabel = `${month.slice(0, 4)}년 ${Number(month.slice(5, 7))}월`;
   const isCurrentMonth = month === new Date().toISOString().slice(0, 7);
@@ -110,12 +115,14 @@ export default function MonthlyDashboard({
               }
             : weeklySnap;
         const flow =
-          c.group !== "us" && snap?.code
+          c.group === "self"
+            ? buildInnospaceFlowFromDaily(dailyRows, month)
+            : c.group !== "us" && snap?.code
             ? buildFlowSummary(investorFlowRows, snap.code, month)
             : null;
         return { ...c, snap, flow };
       }),
-    [priceRows, investorFlowRows, chartRows, usHistoryRows, month]
+    [priceRows, investorFlowRows, chartRows, usHistoryRows, dailyRows, month]
   );
 
   const selfRow = tableRows.find((r) => r.group === "self");
@@ -168,6 +175,13 @@ export default function MonthlyDashboard({
     [companyNewsRows, month]
   );
 
+  // 시장별 기준일이 다를 수 있으므로 억지로 통일하지 않고 각각 명확히 표시
+  const latestDomesticDate = kospiRows.length ? kospiRows[kospiRows.length - 1].date : null;
+  const latestUsDate = useMemo(() => {
+    const dates = usHistoryRows.filter((r) => r.date.startsWith(month)).map((r) => r.date);
+    return dates.length ? dates.sort().reverse()[0] : null;
+  }, [usHistoryRows, month]);
+
   const latestFx = tableRows
     .filter((r) => r.group === "us" && r.snap?.fxRate != null)
     .map((r) => r.snap!)
@@ -180,11 +194,15 @@ export default function MonthlyDashboard({
           {monthLabel}
           {isCurrentMonth && (
             <span className="ml-2 text-[11px] px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 align-middle">
-              진행 중 · 최신 주간 리포트 기준
+              진행 중 · 최신 거래일 기준
             </span>
           )}
+          <span className="ml-2 text-[11px] text-slate-500">
+            국내 {latestDomesticDate ?? "-"} 종가
+            {latestUsDate && ` · 미국 ${latestUsDate} 종가`}
+          </span>
         </p>
-        <MonthSelector month={month} />
+        <MonthSelector month={month} availableMonths={availableMonths} />
       </div>
 
       {/* B. 월간 핵심 요약 */}
@@ -377,6 +395,20 @@ function buildSnapshot(rows: WeeklyPriceRow[], name: string, month: string): Com
 
 type FlowSummary = { individual: number; foreign: number; institution: number; otherTotal: number };
 
+// 이노스페이스(당사)는 domestic_investor_flow에 없고 daily_data(일간 페이지 소스)에 있음 - 종목코드가 아닌
+// 전용 시트라 별도 함수로 처리. 일간 페이지와 동일한 필드(indiv/foreign/inst/etcTotal)를 월 단위로 합산.
+function buildInnospaceFlowFromDaily(rows: DailyRow[], month: string): FlowSummary | null {
+  const monthKey = month.replace("-", "");
+  const monthRows = rows.filter((r) => r.d && r.d.startsWith(monthKey));
+  if (monthRows.length === 0) return null;
+  return {
+    individual: monthRows.reduce((s, r) => s + (r.indiv ?? 0), 0),
+    foreign: monthRows.reduce((s, r) => s + (r.foreign ?? 0), 0),
+    institution: monthRows.reduce((s, r) => s + (r.inst ?? 0), 0),
+    otherTotal: monthRows.reduce((s, r) => s + (r.etcTotal ?? 0), 0),
+  };
+}
+
 function buildFlowSummary(rows: DomesticInvestorFlowRow[], code: string, month: string): FlowSummary | null {
   const companyRows = rows.filter((r) => r.code === code && r.date.startsWith(month));
   if (companyRows.length === 0) return null;
@@ -506,17 +538,14 @@ function RetPct({ v }: { v: number | null }) {
   );
 }
 
-function MonthSelector({ month }: { month: string }) {
+function MonthSelector({ month, availableMonths }: { month: string; availableMonths: string[] }) {
   const router = useRouter();
-  const options = useMemo(() => {
-    const [y, m] = month.split("-").map(Number);
-    const list: string[] = [];
-    for (let i = 0; i < 6; i++) {
-      const d = new Date(y, m - 1 - i, 1);
-      list.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
-    }
-    return list;
-  }, [month]);
+  // 실제 데이터가 존재하는 달만 목록에 표시한다 (기계적인 최근 N개월 생성 금지).
+  // 현재 선택된 달이 목록에 없는 경우(예: URL 직접 입력)에도 항상 포함시켜 목록에서 사라지지 않게 한다.
+  const options = availableMonths.includes(month)
+    ? availableMonths
+    : [month, ...availableMonths].sort((a, b) => b.localeCompare(a));
+
   return (
     <select
       value={month}
@@ -531,9 +560,6 @@ function MonthSelector({ month }: { month: string }) {
     </select>
   );
 }
-
-// ---------- I장: 지수 카드 ----------
-
 function IndexCard({ title, rows }: { title: string; rows: IndexDailyRow[] }) {
   const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
   const first = sorted[0];
@@ -986,8 +1012,6 @@ type NewsItemLike = {
 };
 
 function NewsRow({ item }: { item: NewsItemLike }) {
-  const [expanded, setExpanded] = useState(false);
-  const hasDetail = !!item.commentary;
   return (
     <div className="px-4 py-2.5">
       <div className="flex items-start gap-2">
@@ -1010,23 +1034,11 @@ function NewsRow({ item }: { item: NewsItemLike }) {
           >
             {item.title}
           </a>
-          {hasDetail && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="block text-[11px] text-slate-500 hover:text-slate-300 mt-0.5"
-            >
-              {expanded ? "분석 접기 ▲" : "분석 보기 ▼"}
-            </button>
-          )}
-          {expanded && hasDetail && (
-            <p className="text-[12px] text-slate-400 mt-1 leading-relaxed">{item.commentary}</p>
-          )}
         </div>
       </div>
     </div>
   );
 }
-
 function EmptyNews() {
   return (
     <p className="px-4 py-6 text-center text-[12px] text-slate-500">이번 달 수집된 기사가 없습니다.</p>
@@ -1373,7 +1385,7 @@ function CompanyNewsCard({
       </div>
       {group.articles.length === 0 ? (
         <p className="text-[11px] text-slate-500 py-3 text-center flex-1">
-          이번 달 관련 기사가 없습니다.
+          이번 달 별도 보고할 주요 기사가 없습니다.
         </p>
       ) : (
         <div className="space-y-2 flex-1">
