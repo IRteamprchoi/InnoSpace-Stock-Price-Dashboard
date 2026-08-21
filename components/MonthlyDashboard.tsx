@@ -1060,7 +1060,7 @@ function CompanyDetail({
 
   return (
     <div className="flex flex-col lg:flex-row gap-4">
-      {/* 왼쪽: 컴팩트 정보 패널 (~38-40%) */}
+      {/* 왼쪽: 2x2 정보 카드 (~38-40%) */}
       <div className="lg:w-[38%] space-y-3 shrink-0">
         <div className="grid grid-cols-2 gap-2">
           <MiniStatCard
@@ -1069,39 +1069,32 @@ function CompanyDetail({
           />
           <MiniStatCard label="월중 최고가" value={fmtPrice(snap.monthHigh, isUs)} />
           <MiniStatCard label="월중 최저가" value={fmtPrice(snap.monthLow, isUs)} />
-          <MiniStatCard label="집계 기준" value={`${snap.weeksCount}개 주간 리포트`} />
-        </div>
-
-        <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-3">
-          <p className="text-[10px] text-slate-500 mb-1.5">시가총액 변화</p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[13px] font-semibold text-slate-200 tabular-nums">
-              {fmtMarketCapKrw(snap.openMarketCap)}
-            </span>
-            <span className="text-slate-600 text-[12px]">→</span>
-            <span className="text-[13px] font-semibold text-slate-200 tabular-nums">
+          <div className="bg-slate-900/60 border border-slate-700 rounded-lg px-2.5 py-2">
+            <p className="text-[10px] text-slate-500">시가총액 변화</p>
+            <p className="text-[12px] font-medium text-slate-200 tabular-nums leading-tight mt-0.5">
+              {fmtMarketCapKrw(snap.openMarketCap)} →
+            </p>
+            <p className="text-[12px] font-medium text-slate-200 tabular-nums leading-tight">
               {fmtMarketCapKrw(snap.closeMarketCap)}
-            </span>
+            </p>
+            <p className={`text-[11px] font-semibold tabular-nums mt-0.5 ${toneColor(toneOf(snap.marketCapChange))}`}>
+              {snap.marketCapChange != null
+                ? `${snap.marketCapChange >= 0 ? "+" : "-"}${fmtMarketCapKrw(Math.abs(snap.marketCapChange))}`
+                : "-"}
+              {marketCapPctChange != null && (
+                <span className="font-normal">
+                  ({marketCapPctChange >= 0 ? "+" : ""}
+                  {marketCapPctChange.toFixed(1)}%)
+                </span>
+              )}
+            </p>
           </div>
-          <p
-            className={`text-[12px] font-medium tabular-nums mt-1 ${toneColor(toneOf(snap.marketCapChange))}`}
-          >
-            {snap.marketCapChange != null
-              ? `${snap.marketCapChange >= 0 ? "+" : "-"}${fmtMarketCapKrw(Math.abs(snap.marketCapChange))}`
-              : "-"}
-            {marketCapPctChange != null && (
-              <span className="font-normal ml-1">
-                ({marketCapPctChange >= 0 ? "+" : ""}
-                {marketCapPctChange.toFixed(2)}%)
-              </span>
-            )}
-          </p>
         </div>
 
         <div>
-          <p className="text-[10px] text-slate-500 mb-1.5">투자자별 누적 순매수</p>
+          <p className="text-[10px] text-slate-500 mb-1">투자자별 누적 순매수</p>
           {isUs || !flow ? (
-            <p className="text-[11px] text-slate-500 bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2">
+            <p className="text-[11px] text-slate-500 bg-slate-900/60 border border-slate-700 rounded-lg px-2.5 py-1.5">
               해당 종목은 투자자별 매매동향 데이터가 제공되지 않습니다.
             </p>
           ) : (
@@ -1117,7 +1110,7 @@ function CompanyDetail({
 
       {/* 오른쪽: 월간 주가 추이 차트 (~60-62%) */}
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] text-slate-500 mb-1.5">
+        <p className="text-[10px] text-slate-500 mb-1">
           월간 주가 추이
           {dailyPoints.length > 0 && (
             <span className="ml-1 text-slate-600">
@@ -1125,7 +1118,7 @@ function CompanyDetail({
             </span>
           )}
         </p>
-        <DailyPriceChart points={dailyPoints} isUs={isUs} height={280} />
+        <DailyPriceChart points={dailyPoints} isUs={isUs} height={270} />
       </div>
     </div>
   );
