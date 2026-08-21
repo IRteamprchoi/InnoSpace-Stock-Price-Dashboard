@@ -101,7 +101,7 @@ export default function MonthlyDashboard({
           : [];
         // 실제 일별 데이터가 있으면 그걸로 월초/월말/최고/최저/등락률을 다시 계산 (더 정확함).
         // 주간 리포트 스냅샷은 marketCap/shares/거래량 등 일별 데이터에 없는 값만 보완적으로 사용.
-        const snap =
+        let snap =
           weeklySnap && dailyPoints.length >= 2
             ? {
                 ...weeklySnap,
@@ -115,6 +115,51 @@ export default function MonthlyDashboard({
                 monthLow: Math.min(...dailyPoints.map((p) => p.value)),
               }
             : weeklySnap;
+
+        // 발행주식수/시가총액 정확화:
+        // 주간 리포트의 "월초" 행은 그 주의 금요일 값을 담고 있어 실제 월요일(월초)과 다를 수 있다.
+        // 월 시작 이전의 마지막 주간 리포트가 실제 월초 발행주식수에 훨씬 더 가깝다(검증 완료).
+        // 일간·주간 원본 데이터는 읽기만 하며 수정하지 않는다.
+        if (snap) {
+          const allRowsForCompany = priceRows
+            .filter((r) => r.name === c.name)
+            .sort((a, b) => a.refFriday.localeCompare(b.refFriday));
+          const preMonthRow = [...allRowsForCompany]
+            .filter((r) => r.refFriday < `${month}-01`)
+            .pop();
+          const inMonthRows = allRowsForCompany.filter((r) => r.refFriday.startsWith(month));
+          const openSharesRow = preMonthRow ?? inMonthRows[0];
+          const closeSharesRow = inMonthRows[inMonthRows.length - 1];
+
+          if (openSharesRow?.shares != null && closeSharesRow?.shares != null) {
+            const isUsCompany2 = c.group === "us";
+            const openMcap =
+              isUsCompany2 && openSharesRow.fxRate != null
+                ? snap.openClose * openSharesRow.shares * openSharesRow.fxRate
+                : snap.openClose * openSharesRow.shares;
+            const closeMcap =
+              isUsCompany2 && closeSharesRow.fxRate != null
+                ? snap.closeClose * closeSharesRow.shares * closeSharesRow.fxRate
+                : snap.closeClose * closeSharesRow.shares;
+            snap = {
+              ...snap,
+              shares: closeSharesRow.shares,
+              openMarketCap: openMcap,
+              closeMarketCap: closeMcap,
+              marketCapChange: closeMcap - openMcap,
+            };
+          }
+
+          // 당사(이노스페이스)는 daily_data(일간 페이지 원본)에 실제 일별 거래량이 있으므로
+          // 주간 리포트 누적치 대신 일별 거래량을 직접 합산한다(중복·재합산 방지).
+          if (c.group === "self") {
+            const monthDailyRows = dailyRows.filter((r) => r.d && r.d.startsWith(month));
+            if (monthDailyRows.length > 0) {
+              const sumVol = monthDailyRows.reduce((s, r) => s + (r.vol ?? 0), 0);
+              snap = { ...snap, monthVolume: sumVol };
+            }
+          }
+        }
         const flow =
           c.group === "self"
             ? buildInnospaceFlowFromDaily(dailyRows, month)
