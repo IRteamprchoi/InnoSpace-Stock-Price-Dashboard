@@ -248,10 +248,7 @@ export default function MonthlyDashboard({
       })
       .filter((g) => g.items.length > 0);
   }, [marketNewsRows, month]);
-    return dedupeByLink(filtered).sort(
-      (a, b) => a.pubDate.localeCompare(b.pubDate) || (a.market === b.market ? 0 : a.market === "KR" ? -1 : 1)
-    );
-  }, [marketNewsRows, month]);
+
 
   const selfNews = useMemo(
     () =>
