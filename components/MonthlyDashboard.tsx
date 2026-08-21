@@ -131,7 +131,31 @@ export default function MonthlyDashboard({
           const openSharesRow = preMonthRow ?? inMonthRows[0];
           const closeSharesRow = inMonthRows[inMonthRows.length - 1];
 
-          if (openSharesRow?.shares != null && closeSharesRow?.shares != null && snap.openClose != null && snap.closeClose != null) {
+          // 당사(이노스페이스)는 daily_data(일간 페이지 원본, 읽기 전용)에 그날그날의 정확한
+          // 시가총액이 있다. 시가총액 = 그날 상장주식수 × 그날 종가로 KIS가 이미 계산해 준 값이므로,
+          // 역으로 나누면 근사치가 아니라 그날 KIS가 실제로 사용한 정확한 상장주식수가 나온다.
+          // (국내 피어그룹은 이런 일별 소스가 없어 주간 리포트 스냅샷을 계속 사용한다.)
+          if (c.group === "self" && dailyPoints.length >= 2) {
+            const openDate = dailyPoints[0].date;
+            const closeDate = dailyPoints[dailyPoints.length - 1].date;
+            const openDailyRow = dailyRows.find((r) => r.d === openDate);
+            const closeDailyRow = dailyRows.find((r) => r.d === closeDate);
+            if (openDailyRow?.mcap != null && closeDailyRow?.mcap != null && openDailyRow.close) {
+              const openShares = Math.round(openDailyRow.mcap / openDailyRow.close);
+              snap = {
+                ...snap,
+                shares: Math.round(closeDailyRow.mcap / closeDailyRow.close),
+                openMarketCap: openDailyRow.mcap,
+                closeMarketCap: closeDailyRow.mcap,
+                marketCapChange: closeDailyRow.mcap - openDailyRow.mcap,
+              };
+            }
+          } else if (
+            openSharesRow?.shares != null &&
+            closeSharesRow?.shares != null &&
+            snap.openClose != null &&
+            snap.closeClose != null
+          ) {
             const isUsCompany2 = c.group === "us";
             const openMcap =
               isUsCompany2 && openSharesRow.fxRate != null
