@@ -176,6 +176,12 @@ export default function MonthlyDashboard({
     .filter((r) => r.snap?.closeMarketCap != null)
     .sort((a, b) => (b.snap!.closeMarketCap as number) - (a.snap!.closeMarketCap as number));
   const selfCapRank = capRankSorted.findIndex((r) => r.name === "이노스페이스") + 1;
+  const marketCapPctChange =
+    selfRow?.snap?.openMarketCap != null &&
+    selfRow.snap.openMarketCap !== 0 &&
+    selfRow?.snap?.marketCapChange != null
+      ? (selfRow.snap.marketCapChange / selfRow.snap.openMarketCap) * 100
+      : null;
 
   const selfFlowD = selfRow?.flow;
   const flowEntries = selfFlowD
