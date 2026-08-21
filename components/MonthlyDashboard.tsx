@@ -224,8 +224,30 @@ export default function MonthlyDashboard({
 
 
 
-  const monthMarketNews = useMemo(() => {
-    const filtered = marketNewsRows.filter((r) => weekBelongsToMonth(r, month));
+    // 주차별 시장 시황: 제목만으로 이해 가능한 기사만 선별하고, 주차당 최대 2건(국내1+미국1)만 남긴다.
+  const marketWeeklyGroups = useMemo(() => {
+    const isGenericTitle = (title: string) =>
+      /^\[오늘의증시\]|오늘의\s*코스피|오늘의\s*증시|^\d[\d.,\s]*$/.test(title.trim());
+    const monthRows = marketNewsRows.filter((r) => r.reportDate.startsWith(month) && !isGenericTitle(r.title));
+    const deduped = dedupeByLink(monthRows);
+
+    const byWeek = new Map<number, typeof deduped>();
+    deduped.forEach((r) => {
+      const day = Number(r.reportDate.slice(8, 10));
+      const weekNum = Math.ceil(day / 7);
+      byWeek.set(weekNum, [...(byWeek.get(weekNum) ?? []), r]);
+    });
+
+    return Array.from(byWeek.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([weekNum, items]) => {
+        const kr = items.find((r) => r.market === "KR");
+        const us = items.find((r) => r.market === "US");
+        const picked = [kr, us].filter((x): x is NonNullable<typeof x> => !!x);
+        return { weekNum, items: picked };
+      })
+      .filter((g) => g.items.length > 0);
+  }, [marketNewsRows, month]);
     return dedupeByLink(filtered).sort(
       (a, b) => a.pubDate.localeCompare(b.pubDate) || (a.market === b.market ? 0 : a.market === "KR" ? -1 : 1)
     );
@@ -433,12 +455,16 @@ export default function MonthlyDashboard({
         {/* A. 월간 시장 시황 */}
         <div>
           <h3 className="text-[13px] font-medium text-slate-300 mb-2">월간 시장 시황</h3>
-          {monthMarketNews.length === 0 ? (
+          {marketWeeklyGroups.length === 0 ? (
             <EmptyNews />
           ) : (
             <div className="rounded-xl border border-slate-700 bg-slate-900/50 divide-y divide-slate-800">
-              {monthMarketNews.slice(0, 4).map((n) => (
-                <NewsRow key={n.link} item={n} />
+              {marketWeeklyGroups.map((g) => (
+                <div key={g.weekNum}>
+                  {g.items.map((n, i) => (
+                    <NewsRow key={n.link} item={n} weekLabel={i === 0 ? `${monthLabel} ${g.weekNum}주차` : undefined} />
+                  ))}
+                </div>
               ))}
             </div>
           )}
@@ -1168,9 +1194,12 @@ type NewsItemLike = {
   commentary?: string;
 };
 
-function NewsRow({ item }: { item: NewsItemLike }) {
+function NewsRow({ item, weekLabel }: { item: NewsItemLike; weekLabel?: string }) {
   return (
     <div className="px-4 py-2.5">
+      {weekLabel && (
+        <p className="text-[10px] font-semibold text-amber-400/80 mb-1">{weekLabel}</p>
+      )}
       <div className="flex items-start gap-2">
         {item.market && (
           <span className="mt-0.5 shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
