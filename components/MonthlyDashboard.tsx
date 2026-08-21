@@ -159,16 +159,23 @@ export default function MonthlyDashboard({
       ? topPerformer.pct - selfChangePct
       : 0;
 
-  // 발행주식수 변동 여부 (등락률과 시가총액 증감률 괴리 확인용)
-  const sharesChanged =
-    selfRow?.snap?.shares != null &&
-    (() => {
-      const rows = priceRows
-        .filter((r) => r.name === "이노스페이스" && r.refFriday.startsWith(month))
-        .sort((a, b) => a.refFriday.localeCompare(b.refFriday));
-      if (rows.length < 2) return false;
-      return rows[0].shares !== rows[rows.length - 1].shares;
-    })();
+  // 발행주식수 월초 대비 정확한 증감 수량
+  const sharesDiff = (() => {
+    const rows = priceRows
+      .filter((r) => r.name === "이노스페이스" && r.refFriday.startsWith(month))
+      .sort((a, b) => a.refFriday.localeCompare(b.refFriday));
+    if (rows.length < 2) return null;
+    const first = rows[0].shares;
+    const last = rows[rows.length - 1].shares;
+    if (first == null || last == null) return null;
+    return last - first;
+  })();
+
+  // 시가총액 기준 순위 (해외기업도 동일 기준일 환율로 원화 환산된 closeMarketCap 사용)
+  const capRankSorted = tableRows
+    .filter((r) => r.snap?.closeMarketCap != null)
+    .sort((a, b) => (b.snap!.closeMarketCap as number) - (a.snap!.closeMarketCap as number));
+  const selfCapRank = capRankSorted.findIndex((r) => r.name === "이노스페이스") + 1;
 
   const selfFlowD = selfRow?.flow;
   const flowEntries = selfFlowD
@@ -204,7 +211,7 @@ export default function MonthlyDashboard({
         : "";
     return `당사는 코스닥 대비 ${excessVsKosdaq >= 0 ? "+" : ""}${excessVsKosdaq.toFixed(
       1
-    )}%p의 초과수익률을 기록했으며 피어그룹 ${rankSorted.length}개사 중 ${selfRank}위를 기록했습니다.${
+    )}%p의 초과수익률을 기록했으며, 주가 상승폭 기준 피어그룹 ${rankSorted.length}개사 중 ${selfRank}위, 시가총액 기준 ${selfCapRank}위를 기록했습니다.${
       flowNote ? " " + flowNote + "를 보였습니다." : ""
     }`;
   })();
@@ -282,41 +289,64 @@ export default function MonthlyDashboard({
       {/* B. 경영진 요약: 상대수익률 / 피어그룹 위치 / 기업가치 / 수급·유동성 */}
       <section className="space-y-2">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-          <SummaryPanel title="당사 상대수익률">
+          <SummaryPanel title="월초 대비 주가 등락률">
             <p className={`text-xl font-semibold tabular-nums ${toneColor(toneOf(selfChangePct))}`}>
               당사 {pctText(selfChangePct)}
             </p>
-            <p className="text-[11px] text-slate-400 mt-1">
-              코스닥 대비 {pctPointText(excessVsKosdaq)} · 피어평균 대비 {pctPointText(excessVsPeerAvg)}
-            </p>
+            <div className="mt-1.5 space-y-0.5">
+              <p className="text-[11px] text-slate-400 whitespace-nowrap">
+                코스닥 대비 <span className="tabular-nums">{pctPointText(excessVsKosdaq)}</span>
+              </p>
+              <p className="text-[11px] text-slate-400 whitespace-nowrap">
+                피어그룹 평균 대비 <span className="tabular-nums">{pctPointText(excessVsPeerAvg)}</span>
+              </p>
+            </div>
           </SummaryPanel>
 
-          <SummaryPanel title="피어그룹 내 위치">
-            <p className="text-xl font-semibold tabular-nums text-slate-100">
-              {rankSorted.length}개사 중 {selfRank || "-"}위
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1">
+          <SummaryPanel title="피어그룹 내 순위">
+            <div className="space-y-1">
+              <p className="text-[13px] text-slate-200">
+                주가 상승폭 순위{" "}
+                <span className="text-[15px] font-semibold tabular-nums text-slate-100">
+                  {selfRank || "-"}위 / {rankSorted.length}개사
+                </span>
+              </p>
+              <p className="text-[13px] text-slate-200">
+                월말 시가총액 순위{" "}
+                <span className="text-[15px] font-semibold tabular-nums text-slate-100">
+                  {selfCapRank || "-"}위 / {capRankSorted.length}개사
+                </span>
+              </p>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1.5">
               상승 {upCount}개사 · 하락 {downCount}개사
-              {selfRank !== 1 && topPerformer
-                ? ` · 1위(${topPerformer.name})와 ${gapToTop.toFixed(1)}%p 차이`
-                : ""}
             </p>
           </SummaryPanel>
 
-          <SummaryPanel title="기업가치 변화">
-            <p className="text-xl font-semibold tabular-nums text-slate-100">
+          <SummaryPanel title="시가총액 변화">
+            <p className="text-[13px] text-slate-200 tabular-nums">
+              {fmtMarketCapKrw(selfRow?.snap?.openMarketCap ?? null)} →{" "}
               {fmtMarketCapKrw(selfRow?.snap?.closeMarketCap ?? null)}
             </p>
-            <p className="text-[11px] text-slate-400 mt-1">
-              {fmtMarketCapKrw(selfRow?.snap?.openMarketCap ?? null)} →{" "}
-              <span className={toneColor(toneOf(selfRow?.snap?.marketCapChange ?? null))}>
-                {selfRow?.snap?.marketCapChange != null
-                  ? `${selfRow.snap.marketCapChange >= 0 ? "+" : "-"}${fmtMarketCapKrw(
-                      Math.abs(selfRow.snap.marketCapChange)
-                    )}`
-                  : "-"}
-              </span>
-              {sharesChanged && " · 발행주식수 변동 있음"}
+            <p className={`text-[14px] font-semibold tabular-nums mt-0.5 ${toneColor(toneOf(selfRow?.snap?.marketCapChange ?? null))}`}>
+              {selfRow?.snap?.marketCapChange != null
+                ? `${selfRow.snap.marketCapChange >= 0 ? "+" : "-"}${fmtMarketCapKrw(
+                    Math.abs(selfRow.snap.marketCapChange)
+                  )} ${selfRow.snap.marketCapChange >= 0 ? "증가" : "감소"}`
+                : "-"}
+              {marketCapPctChange != null && (
+                <span className="text-[11px] font-normal ml-1">
+                  ({marketCapPctChange >= 0 ? "+" : ""}
+                  {marketCapPctChange.toFixed(2)}%)
+                </span>
+              )}
+            </p>
+            <p className="text-[11px] text-slate-500 mt-1">
+              {sharesDiff == null
+                ? "발행주식수 데이터 없음"
+                : sharesDiff === 0
+                ? "발행주식수 변동 없음"
+                : `발행주식수 월초 대비 ${sharesDiff > 0 ? "+" : ""}${sharesDiff.toLocaleString("ko-KR")}주`}
             </p>
           </SummaryPanel>
 
@@ -324,25 +354,32 @@ export default function MonthlyDashboard({
             {flowEntries.length === 0 ? (
               <p className="text-[13px] text-slate-500">데이터 집계 중</p>
             ) : (
-              <>
-                <p className="text-[13px] text-slate-200">
-                  최대 순매수:{" "}
-                  <span className="text-red-400 font-medium">
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+                <div>
+                  <p className="text-[10px] text-slate-500">최대 순매수</p>
+                  <p className="text-[13px] font-medium text-red-400 tabular-nums">
                     {biggestBuyer?.label} {fmtFlow(biggestBuyer?.value)}
-                  </span>
-                </p>
-                <p className="text-[13px] text-slate-200">
-                  최대 순매도:{" "}
-                  <span className="text-blue-400 font-medium">
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500">최대 순매도</p>
+                  <p className="text-[13px] font-medium text-blue-400 tabular-nums">
                     {biggestSeller?.label} {fmtFlow(biggestSeller?.value)}
-                  </span>
-                </p>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  월간 거래량 {fmtVolume(selfRow?.snap?.monthVolume ?? null)}
-                  {avgDailyVolume != null && ` · 일평균 ${avgDailyVolume.toLocaleString("ko-KR")}주`}
-                  {turnoverPct != null && ` · 회전율 ${turnoverPct.toFixed(1)}%`}
-                </p>
-              </>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500">월간 총거래량</p>
+                  <p className="text-[13px] font-medium text-slate-200 tabular-nums">
+                    {fmtVolume(selfRow?.snap?.monthVolume ?? null)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500">일평균 거래량</p>
+                  <p className="text-[13px] font-medium text-slate-200 tabular-nums">
+                    {avgDailyVolume != null ? avgDailyVolume.toLocaleString("ko-KR") + "주" : "-"}
+                  </p>
+                </div>
+              </div>
             )}
           </SummaryPanel>
         </div>
