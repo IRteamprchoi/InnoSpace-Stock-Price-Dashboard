@@ -1543,9 +1543,16 @@ function scoreArticle(a: WeeklyNewsRow): number {
 }
 
 function selectTopArticles(articles: WeeklyNewsRow[]): WeeklyNewsRow[] {
-  // 1) URL 동일 제거
-  const byLink = dedupeByLink(articles);
-  // 2) 제목이 사실상 동일한 기사 제거 (정규화 후 동일하면 대표 1건만)
+  // 1) 포토뉴스·영상뉴스 등 내용 없는 기사, 단순 시황("주가 올랐다" 류) 기사 제외
+  const isLowQuality = (title: string) =>
+    /\[?(포토|사진|영상)\]?/.test(title) ||
+    /^\[포토\]|\(사진\)|\(영상\)/.test(title) ||
+    /주가.{0,4}(올랐다|상승했다|급등했다)\.?$/.test(title.trim());
+  const qualityFiltered = articles.filter((a) => !isLowQuality(a.title));
+
+  // 2) URL 동일 제거
+  const byLink = dedupeByLink(qualityFiltered);
+  // 3) 제목이 사실상 동일한 기사 제거 (정규화 후 동일하면 대표 1건만)
   const seenTitles = new Set<string>();
   const deduped: WeeklyNewsRow[] = [];
   for (const a of byLink) {
@@ -1554,10 +1561,23 @@ function selectTopArticles(articles: WeeklyNewsRow[]): WeeklyNewsRow[] {
     if (key) seenTitles.add(key);
     deduped.push(a);
   }
-  // 3) 중요도 -> 최신순 정렬 후 최대 4건
-  return deduped
-    .sort((a, b) => scoreArticle(b) - scoreArticle(a) || b.pubDate.localeCompare(a.pubDate))
-    .slice(0, 4);
+
+  // 4) 중요도 -> 최신순 정렬
+  const sorted = deduped.sort(
+    (a, b) => scoreArticle(b) - scoreArticle(a) || b.pubDate.localeCompare(a.pubDate)
+  );
+
+  // 5) 동일 주차(같은 report_date) 기사는 최대 2건까지만, 전체 최대 4건
+  const weekCounts = new Map<string, number>();
+  const result: WeeklyNewsRow[] = [];
+  for (const a of sorted) {
+    if (result.length >= 4) break;
+    const count = weekCounts.get(a.reportDate) ?? 0;
+    if (count >= 2) continue;
+    weekCounts.set(a.reportDate, count + 1);
+    result.push(a);
+  }
+  return result;
 }
 
 function CompanyNewsCard({
@@ -1585,7 +1605,10 @@ function CompanyNewsCard({
           </span>
           <span className="text-[13px] font-medium text-slate-100">{group.name}</span>
         </div>
-        <RetPct v={changePct} />
+        <div className="text-right">
+          <p className="text-[9px] text-slate-500 leading-none mb-0.5">월초 대비</p>
+          <RetPct v={changePct} />
+        </div>
       </div>
       {group.articles.length === 0 ? (
         <p className="text-[11px] text-slate-500 py-3 text-center flex-1">
