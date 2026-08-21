@@ -131,7 +131,7 @@ export default function MonthlyDashboard({
           const openSharesRow = preMonthRow ?? inMonthRows[0];
           const closeSharesRow = inMonthRows[inMonthRows.length - 1];
 
-          if (openSharesRow?.shares != null && closeSharesRow?.shares != null) {
+          if (openSharesRow?.shares != null && closeSharesRow?.shares != null && snap.openClose != null && snap.closeClose != null) {
             const isUsCompany2 = c.group === "us";
             const openMcap =
               isUsCompany2 && openSharesRow.fxRate != null
