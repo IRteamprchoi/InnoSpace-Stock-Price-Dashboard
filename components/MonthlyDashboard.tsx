@@ -294,7 +294,7 @@ export default function MonthlyDashboard({
     .sort((a, b) => (b.fxDate ?? "").localeCompare(a.fxDate ?? ""))[0];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <p className="text-[13px] text-slate-400">
           {monthLabel}
