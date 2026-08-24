@@ -289,19 +289,19 @@ export default function MonthlyDashboard({
       ? (selfRow.snap.monthVolume / selfRow.snap.shares) * 100
       : null;
 
-  const execSummarySentence = (() => {
+  const execSummaryLines = (() => {
     if (excessVsKosdaq == null || !selfRank) return null;
     const flowNote =
       flowEntries.length > 0
         ? flowEntries
-            .map((f) => `${f.label}${f.label === "기타" ? "는" : "은"} ${f.value > 0 ? "순매수" : f.value < 0 ? "순매도" : "보합"}`)
+            .map((f) => `${f.label}${f.label === "코스닥" ? "는" : "은"} ${f.value > 0 ? "순매수" : f.value < 0 ? "순매도" : "보합"}`)
             .join(", ")
         : "";
-    return `당사는 코스닥 대비 ${excessVsKosdaq >= 0 ? "+" : ""}${excessVsKosdaq.toFixed(
+    const line1 = `당사는 코스닥 대비 ${excessVsKosdaq >= 0 ? "+" : ""}${excessVsKosdaq.toFixed(
       1
-    )}%p의 초과수익률을 기록했으며, 주가 상승폭 기준 피어그룹 ${rankSorted.length}개사 중 ${selfRank}위, 시가총액 기준 ${selfCapRank}위를 기록했습니다.${
-      flowNote ? " " + flowNote + "를 보였습니다." : ""
-    }`;
+    )}%p의 초과수익률을 기록했으며, 주가 상승폭 기준 피어그룹 ${rankSorted.length}개사 중 ${selfRank}위, 시가총액 기준 ${selfCapRank}위를 기록했습니다.`;
+    const line2 = flowNote ? `${flowNote}를 보였습니다.` : null;
+    return { line1, line2 };
   })();
 
 
@@ -490,10 +490,14 @@ export default function MonthlyDashboard({
             )}
           </SummaryPanel>
         </div>
-        {execSummarySentence && (
-          <p className="text-[12px] text-slate-400 bg-slate-900/40 border border-slate-800 rounded-lg px-3 py-2">
-            {execSummarySentence}
-          </p>
+        {execSummaryLines && (
+          <div
+            className="text-[12px] text-slate-400 bg-slate-900/40 border border-slate-800 rounded-lg px-3 py-2 space-y-0.5"
+            style={{ wordBreak: "keep-all", overflowWrap: "break-word" }}
+          >
+            <p>{execSummaryLines.line1}</p>
+            {execSummaryLines.line2 && <p>{execSummaryLines.line2}</p>}
+          </div>
         )}
       </section>
 
@@ -867,20 +871,20 @@ function IndexCard({ title, rows }: { title: string; rows: IndexDailyRow[] }) {
       </div>
       <div className="grid grid-cols-4 gap-2 text-[11px] mb-2">
         <div>
-          <p className="text-slate-500">월초</p>
-          <p className="tabular-nums text-slate-200">{first.close.toLocaleString("ko-KR")}</p>
+          <p className="text-slate-300 font-semibold">월초 지수</p>
+          <p className="tabular-nums text-slate-100 font-bold">{first.close.toLocaleString("ko-KR")}</p>
         </div>
         <div>
-          <p className="text-slate-500">최신</p>
-          <p className="tabular-nums text-slate-200">{last.close.toLocaleString("ko-KR")}</p>
+          <p className="text-slate-300 font-semibold">월말 지수</p>
+          <p className="tabular-nums text-slate-100 font-bold">{last.close.toLocaleString("ko-KR")}</p>
         </div>
         <div>
-          <p className="text-slate-500">최고</p>
-          <p className="tabular-nums text-slate-200">{high?.toLocaleString("ko-KR")}</p>
+          <p className="text-slate-300 font-semibold">최고</p>
+          <p className="tabular-nums text-slate-100 font-bold">{high?.toLocaleString("ko-KR")}</p>
         </div>
         <div>
-          <p className="text-slate-500">최저</p>
-          <p className="tabular-nums text-slate-200">{low?.toLocaleString("ko-KR")}</p>
+          <p className="text-slate-300 font-semibold">최저</p>
+          <p className="tabular-nums text-slate-100 font-bold">{low?.toLocaleString("ko-KR")}</p>
         </div>
       </div>
       <DailyPriceChart
