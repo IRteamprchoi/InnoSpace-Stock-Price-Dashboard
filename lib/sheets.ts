@@ -359,6 +359,43 @@ export async function getWeeklyChartData(): Promise<WeeklyChartPoint[]> {
   }));
 }
 
+export type DomesticDailyRow = {
+  date: string;
+  code: string;
+  name: string;
+  close: number;
+  marketCap: number | null;
+  shares: number | null;
+  volume: number | null;
+};
+
+// 국내 당사+피어 매일 상장주식수·시가총액 스냅샷(domestic_daily_data 시트).
+// weekly_prices(주간 스냅샷)보다 정확한 일별 값을 월간 리포트에서 바로 쓸 수 있게 한다.
+export async function getDomesticDailyData(): Promise<DomesticDailyRow[]> {
+  const url = process.env.DOMESTIC_DAILY_CSV_URL;
+  if (!url) {
+    console.warn("DOMESTIC_DAILY_CSV_URL 환경변수가 설정되지 않았습니다.");
+    return [];
+  }
+
+  const text = await fetchCsvText(url);
+  if (text === null) {
+    return [];
+  }
+
+  const dataRows = parseCsv(text).slice(1);
+
+  return dataRows.map((r) => ({
+    date: r[0],
+    code: r[1],
+    name: r[2],
+    close: num(r[3]),
+    marketCap: r[4] ? num(r[4]) : null,
+    shares: r[5] ? num(r[5]) : null,
+    volume: r[6] ? num(r[6]) : null,
+  }));
+}
+
 export type WeeklyIntradayRow = {
   tradeDate: string;
   time: string;
