@@ -372,28 +372,35 @@ export type DomesticDailyRow = {
 // 국내 당사+피어 매일 상장주식수·시가총액 스냅샷(domestic_daily_data 시트).
 // weekly_prices(주간 스냅샷)보다 정확한 일별 값을 월간 리포트에서 바로 쓸 수 있게 한다.
 export async function getDomesticDailyData(): Promise<DomesticDailyRow[]> {
-  const url = process.env.DOMESTIC_DAILY_CSV_URL;
-  if (!url) {
-    console.warn("DOMESTIC_DAILY_CSV_URL 환경변수가 설정되지 않았습니다.");
+  // 어떤 오류(fetch 네트워크 실패, URL 미설정, 파싱 오류 등)가 나도 이 함수가
+  // 절대 throw하지 않도록 방어한다 - 전체 Promise.all이 이 함수 하나 때문에 실패해서는 안 된다.
+  try {
+    const url = process.env.DOMESTIC_DAILY_CSV_URL;
+    if (!url) {
+      console.warn("DOMESTIC_DAILY_CSV_URL 환경변수가 설정되지 않았습니다.");
+      return [];
+    }
+
+    const text = await fetchCsvText(url);
+    if (text === null) {
+      return [];
+    }
+
+    const dataRows = parseCsv(text).slice(1);
+
+    return dataRows.map((r) => ({
+      date: r[0],
+      code: r[1],
+      name: r[2],
+      close: num(r[3]),
+      marketCap: r[4] ? num(r[4]) : null,
+      shares: r[5] ? num(r[5]) : null,
+      volume: r[6] ? num(r[6]) : null,
+    }));
+  } catch (e) {
+    console.warn("getDomesticDailyData 실패:", e);
     return [];
   }
-
-  const text = await fetchCsvText(url);
-  if (text === null) {
-    return [];
-  }
-
-  const dataRows = parseCsv(text).slice(1);
-
-  return dataRows.map((r) => ({
-    date: r[0],
-    code: r[1],
-    name: r[2],
-    close: num(r[3]),
-    marketCap: r[4] ? num(r[4]) : null,
-    shares: r[5] ? num(r[5]) : null,
-    volume: r[6] ? num(r[6]) : null,
-  }));
 }
 
 export type WeeklyIntradayRow = {
