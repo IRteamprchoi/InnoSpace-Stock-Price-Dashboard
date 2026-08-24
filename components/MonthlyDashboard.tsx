@@ -1546,7 +1546,7 @@ function DailyCompareChart({ kospi, kosdaq }: { kospi: ChartPoint[]; kosdaq: Cha
     const val = dataKey === "kospi" ? kospiEnd : kosdaqEnd;
     const color = val > 0 ? "#f87171" : val < 0 ? "#60a5fa" : "#94a3b8";
     const dy = dataKey === "kospi" ? kospiDy : kosdaqDy;
-    const label = `${dataKey === "kospi" ? "코스피" : "코스닥"} ${val >= 0 ? "+" : ""}${val.toFixed(2)}%`;
+    const label = `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`;
     return (
       <text x={x + 6} y={y + dy} dy={4} fontSize={11} fontWeight={600} fill={color} textAnchor="start">
         {label}
