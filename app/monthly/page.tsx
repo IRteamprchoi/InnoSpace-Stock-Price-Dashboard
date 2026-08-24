@@ -7,6 +7,7 @@ import {
   getWeeklyPrices,
   getWeeklyNews,
   getDomesticInvestorFlow,
+  getDomesticDailyData,
   getWeeklyChartData,
   getUsStockHistory,
   getDailyData,
@@ -23,6 +24,7 @@ export default async function MonthlyPage({
     priceRows,
     companyNewsRows,
     investorFlowRows,
+    domesticDailyRows,
     chartRows,
     usHistoryRows,
     dailyRows,
@@ -32,6 +34,7 @@ export default async function MonthlyPage({
     getWeeklyPrices(),
     getWeeklyNews(),
     getDomesticInvestorFlow(),
+    getDomesticDailyData(),
     getWeeklyChartData(),
     getUsStockHistory(),
     getDailyData(),
@@ -68,6 +71,7 @@ export default async function MonthlyPage({
         priceRows={priceRows}
         companyNewsRows={companyNewsRows}
         investorFlowRows={investorFlowRows}
+        domesticDailyRows={domesticDailyRows}
         chartRows={chartRows}
         usHistoryRows={usHistoryRows}
         dailyRows={dailyRows}
