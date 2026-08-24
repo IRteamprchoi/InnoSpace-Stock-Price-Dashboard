@@ -310,7 +310,13 @@ export default function MonthlyDashboard({
   // 주차 계산: 해당 월의 첫 영업일(월~금)이 포함된 일요일~토요일 구간을 1주차로 정의.
 // 순수 캘린더 날짜 문자열 연산만 사용해 Asia/Seoul 기준 날짜가 UTC 변환으로 밀리지 않게 한다.
 function getKoreanWeekNumber(dateStr: string, month: string): number | null {
-  if (!dateStr || dateStr.length < 10) return null;
+  if (!dateStr) return null;
+  // pubDate는 RSS 원본 형식(예: "Fri, 07 Aug 2026 02:35:00 GMT")일 수 있어
+  // Date 파싱 후 KST(UTC+9)로 명시적으로 환산해 캘린더 날짜를 구한다(UTC 변환으로 날짜가 밀리지 않도록).
+  const parsed = new Date(dateStr);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const kstTime = parsed.getTime() + 9 * 60 * 60 * 1000;
+  const kst = new Date(kstTime);
   const [y, m] = month.split("-").map(Number);
   let firstBizTime = Date.UTC(y, m - 1, 1);
   let dow = new Date(firstBizTime).getUTCDay();
@@ -319,8 +325,7 @@ function getKoreanWeekNumber(dateStr: string, month: string): number | null {
     dow = new Date(firstBizTime).getUTCDay();
   }
   const weekStartSundayTime = firstBizTime - dow * 86400000;
-  const [ty, tm, td] = dateStr.slice(0, 10).split("-").map(Number);
-  const targetTime = Date.UTC(ty, tm - 1, td);
+  const targetTime = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());
   const diffDays = Math.floor((targetTime - weekStartSundayTime) / 86400000);
   const result = Math.floor(diffDays / 7) + 1;
   return Number.isFinite(result) ? result : null;
