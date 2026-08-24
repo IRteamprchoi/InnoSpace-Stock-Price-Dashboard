@@ -19,6 +19,7 @@ import type {
   WeeklyPriceRow,
   WeeklyNewsRow,
   DomesticInvestorFlowRow,
+  DomesticDailyRow,
   WeeklyChartPoint,
   UsStockHistoryRow,
   DailyRow,
@@ -54,6 +55,7 @@ type MonthlyDashboardProps = {
   priceRows: WeeklyPriceRow[];
   companyNewsRows: WeeklyNewsRow[];
   investorFlowRows: DomesticInvestorFlowRow[];
+  domesticDailyRows: DomesticDailyRow[];
   chartRows: WeeklyChartPoint[];
   usHistoryRows: UsStockHistoryRow[];
   dailyRows: DailyRow[];
@@ -67,6 +69,7 @@ export default function MonthlyDashboard({
   priceRows,
   companyNewsRows,
   investorFlowRows,
+  domesticDailyRows,
   chartRows,
   usHistoryRows,
   dailyRows,
@@ -132,7 +135,29 @@ export default function MonthlyDashboard({
           const closeSharesRow = inMonthRows[inMonthRows.length - 1];
 
           // 당사(이노스페이스)는 daily_data(일간 페이지 원본, 읽기 전용)에 그날그날의 정확한
-          // 시가총액이 있다. 시가총액 = 그날 상장주식수 × 그날 종가로 KIS가 이미 계산해 준 값이므로,          // 국내(당사·피어) 공통: weekly_chart_data에 실제 일별 거래량이 있으면(신규 수집분)
+          // 시가총액이 있다. 시가총액 = 그날 상장주식수 × 그날 종가로 KIS가 이미 계산해 준 값이므로,          // 국내(당사·피어) 공통: domestic_daily_data(매일 KIS lstn_stcn 직접 수집, 신규)가 있으면
+          // weekly_prices(주간 스냅샷 - 월초를 "이번 달 첫 금요일"로 오인하던 문제 있었음)보다 우선 사용한다.
+          if (!isUsCompany && weeklySnap?.code) {
+            const monthDomesticRows = domesticDailyRows
+              .filter((r) => r.code === weeklySnap.code && r.date.startsWith(month) && r.shares != null)
+              .sort((a, b) => a.date.localeCompare(b.date));
+            if (monthDomesticRows.length > 0) {
+              const firstD = monthDomesticRows[0];
+              const lastD = monthDomesticRows[monthDomesticRows.length - 1];
+              const openMcap3 = snap.openClose != null && firstD.shares != null ? snap.openClose * firstD.shares : null;
+              const closeMcap3 = snap.closeClose != null && lastD.shares != null ? snap.closeClose * lastD.shares : null;
+              snap = {
+                ...snap,
+                shares: lastD.shares ?? snap.shares,
+                openMarketCap: openMcap3 ?? snap.openMarketCap,
+                closeMarketCap: closeMcap3 ?? snap.closeMarketCap,
+                marketCapChange:
+                  openMcap3 != null && closeMcap3 != null ? closeMcap3 - openMcap3 : snap.marketCapChange,
+              };
+            }
+          }
+
+          // 국내(당사·피어) 공통: weekly_chart_data에 실제 일별 거래량이 있으면(신규 수집분)
           // 겹치는 주간 리포트를 재합산하는 대신 일별 거래량을 직접 합산한다(중복·재합산 방지).
           if (!isUsCompany && weeklySnap?.code) {
             const monthChartRows = chartRows.filter(
