@@ -463,25 +463,25 @@ export default function MonthlyDashboard({
             ) : (
               <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
                 <div>
-                  <p className="text-[10px] text-slate-500">최대 순매수</p>
+                  <p className="text-[10px] text-slate-300 font-semibold">최대 순매수</p>
                   <p className="text-[13px] font-medium text-red-400 tabular-nums">
                     {biggestBuyer?.label} {fmtFlow(biggestBuyer?.value)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-500">최대 순매도</p>
+                  <p className="text-[10px] text-slate-300 font-semibold">최대 순매도</p>
                   <p className="text-[13px] font-medium text-blue-400 tabular-nums">
                     {biggestSeller?.label} {fmtFlow(biggestSeller?.value)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-500">월간 총거래량</p>
+                  <p className="text-[10px] text-slate-300 font-semibold">월간 총거래량</p>
                   <p className="text-[13px] font-medium text-slate-200 tabular-nums">
                     {fmtVolume(selfRow?.snap?.monthVolume ?? null)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-500">일평균 거래량</p>
+                  <p className="text-[10px] text-slate-300 font-semibold">일평균 거래량</p>
                   <p className="text-[13px] font-medium text-slate-200 tabular-nums">
                     {avgDailyVolume != null ? avgDailyVolume.toLocaleString("ko-KR") + "주" : "-"}
                   </p>
@@ -520,7 +520,7 @@ export default function MonthlyDashboard({
           usHistoryRows={usHistoryRows}
         />
         {latestFx && (
-          <p className="text-[10px] text-slate-500">
+          <p className="text-[10px] text-slate-300 font-semibold">
             해외 종목 원화 환산 적용 환율: 1 USD = {Math.round(latestFx.fxRate as number).toLocaleString("ko-KR")}원
             ({latestFx.fxDate} 기준)
           </p>
@@ -770,7 +770,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function SummaryPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-slate-900/70 border border-slate-700 rounded-xl px-4 py-3">
-      <p className="text-[11px] text-slate-500 mb-1.5">{title}</p>
+      <p className="text-[11px] text-slate-300 font-semibold mb-1.5">{title}</p>
       {children}
     </div>
   );
@@ -957,7 +957,7 @@ function CompareChart({ kospi, kosdaq }: { kospi: IndexDailyRow[]; kosdaq: Index
         <polyline points={toPoints(a)} fill="none" stroke="#f87171" strokeWidth={2} />
         <polyline points={toPoints(b)} fill="none" stroke="#60a5fa" strokeWidth={2} />
       </svg>
-      <p className="text-[10px] text-slate-500 mt-1">월초 종가를 0%로 정규화한 누적 등락률 기준</p>
+      <p className="text-[10px] text-slate-300 font-semibold mt-1">월초 종가를 0%로 정규화한 누적 등락률 기준</p>
     </div>
   );
 }
@@ -1026,7 +1026,7 @@ function PeerMonthlyTable({
                     <tr>
                       <td
                         colSpan={8}
-                        className="px-3 pt-3 pb-1 text-[10px] text-slate-500 bg-slate-900/40"
+                        className="px-3 pt-3 pb-1 text-[10px] text-slate-300 font-semibold bg-slate-900/40"
                       >
                         {groupLabel(r.group)}
                       </td>
@@ -1054,7 +1054,7 @@ function PeerMonthlyTable({
                     <td className="px-3 py-2 text-right tabular-nums text-slate-300">
                       {fmtMarketCapKrw(r.snap?.closeMarketCap ?? null)}
                       {isUs && localCap != null && (
-                        <span className="block text-[10px] text-slate-500">{fmtLocalCap(localCap, true)}</span>
+                        <span className="block text-[10px] text-slate-300 font-semibold">{fmtLocalCap(localCap, true)}</span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-slate-400">
@@ -1094,7 +1094,7 @@ function PeerMonthlyTable({
 function MiniStatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2">
-      <p className="text-[10px] text-slate-500">{label}</p>
+      <p className="text-[10px] text-slate-300 font-semibold">{label}</p>
       <p className="text-[14px] font-semibold text-slate-200 tabular-nums">{value}</p>
     </div>
   );
@@ -1104,7 +1104,7 @@ function FlowStatCard({ label, value }: { label: string; value: number }) {
   const color = value > 0 ? "text-red-400" : value < 0 ? "text-blue-400" : "text-slate-400";
   return (
     <div className="bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2">
-      <p className="text-[10px] text-slate-500">{label}</p>
+      <p className="text-[10px] text-slate-300 font-semibold">{label}</p>
       <p className={`text-[14px] font-semibold tabular-nums ${color}`}>{fmtFlow(value)}</p>
     </div>
   );
@@ -1114,7 +1114,7 @@ function DetailItem({ label, value, tone }: { label: string; value: string; tone
   const color = tone === "up" ? "text-red-400" : tone === "down" ? "text-blue-400" : tone === "flat" ? "text-slate-400" : "text-slate-200";
   return (
     <div>
-      <p className="text-[10px] text-slate-500">{label}</p>
+      <p className="text-[10px] text-slate-300 font-semibold">{label}</p>
       <p className={`text-[13px] tabular-nums ${color}`}>{value}</p>
     </div>
   );
@@ -1181,7 +1181,7 @@ function CompanyDetail({
           <MiniStatCard label="월중 최고가" value={fmtPrice(snap.monthHigh, isUs)} />
           <MiniStatCard label="월중 최저가" value={fmtPrice(snap.monthLow, isUs)} />
           <div className="bg-slate-900/60 border border-slate-700 rounded-lg px-2.5 py-2">
-            <p className="text-[10px] text-slate-500">시가총액 변화</p>
+            <p className="text-[10px] text-slate-300 font-semibold">시가총액 변화</p>
             <p className="text-[12px] font-medium text-slate-200 tabular-nums leading-tight mt-0.5">
               {fmtMarketCapKrw(snap.openMarketCap)} →
             </p>
@@ -1203,7 +1203,7 @@ function CompanyDetail({
         </div>
 
         <div>
-          <p className="text-[10px] text-slate-500 mb-1">투자자별 누적 순매수</p>
+          <p className="text-[10px] text-slate-300 font-semibold mb-1">투자자별 누적 순매수</p>
           {isUs || !flow ? (
             <p className="text-[11px] text-slate-500 bg-slate-900/60 border border-slate-700 rounded-lg px-2.5 py-1.5">
               해당 종목은 투자자별 매매동향 데이터가 제공되지 않습니다.
@@ -1221,7 +1221,7 @@ function CompanyDetail({
 
       {/* 오른쪽: 월간 주가 추이 차트 (~60-62%) */}
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] text-slate-500 mb-1">
+        <p className="text-[10px] text-slate-300 font-semibold mb-1">
           월간 주가 추이
           {dailyPoints.length > 0 && (
             <span className="ml-1 text-slate-600">
