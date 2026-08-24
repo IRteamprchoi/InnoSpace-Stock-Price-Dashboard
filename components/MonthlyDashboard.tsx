@@ -307,7 +307,23 @@ export default function MonthlyDashboard({
 
 
     // 주차별 시장 시황: 제목만으로 이해 가능한 기사만 선별하고, 주차당 최대 2건(국내1+미국1)만 남긴다.
-  const marketWeeklyGroups = useMemo(() => {
+  // 주차 계산: 해당 월의 첫 영업일(월~금)이 포함된 일요일~토요일 구간을 1주차로 정의.
+// 순수 캘린더 날짜 문자열 연산만 사용해 Asia/Seoul 기준 날짜가 UTC 변환으로 밀리지 않게 한다.
+function getKoreanWeekNumber(dateStr: string, month: string): number {
+  const [y, m] = month.split("-").map(Number);
+  let firstBizTime = Date.UTC(y, m - 1, 1);
+  let dow = new Date(firstBizTime).getUTCDay();
+  while (dow === 0 || dow === 6) {
+    firstBizTime += 86400000;
+    dow = new Date(firstBizTime).getUTCDay();
+  }
+  const weekStartSundayTime = firstBizTime - dow * 86400000;
+  const [ty, tm, td] = dateStr.slice(0, 10).split("-").map(Number);
+  const targetTime = Date.UTC(ty, tm - 1, td);
+  const diffDays = Math.floor((targetTime - weekStartSundayTime) / 86400000);
+  return Math.floor(diffDays / 7) + 1;
+}
+const marketWeeklyGroups = useMemo(() => {
     const isGenericTitle = (title: string) =>
       /^\[오늘의증시\]|오늘의\s*코스피|오늘의\s*증시|^\d[\d.,\s]*$/.test(title.trim());
     const monthRows = marketNewsRows.filter((r) => r.reportDate.startsWith(month) && !isGenericTitle(r.title));
@@ -315,8 +331,7 @@ export default function MonthlyDashboard({
 
     const byWeek = new Map<number, typeof deduped>();
     deduped.forEach((r) => {
-      const day = Number(r.reportDate.slice(8, 10));
-      const weekNum = Math.ceil(day / 7);
+      const weekNum = getKoreanWeekNumber(r.pubDate, month);
       byWeek.set(weekNum, [...(byWeek.get(weekNum) ?? []), r]);
     });
 
@@ -744,7 +759,7 @@ function fmtVolume(n: number | null): string {
 function fmtFlow(n: number | undefined | null): string {
   if (n == null) return "-";
   const sign = n > 0 ? "+" : "";
-  return sign + Math.round(n).toLocaleString("ko-KR");
+  return sign + Math.round(n).toLocaleString("ko-KR") + "주";
 }
 
 function pctText(v: number | null): string {
