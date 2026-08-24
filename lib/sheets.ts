@@ -27,6 +27,7 @@ export type DailyRow = {
   etcCorp: number;
   etcForeign: number;
   etcTotal: number;
+  shares: number | null;
 };
 
 export type IntradayRow = {
@@ -147,6 +148,7 @@ export async function getDailyData(): Promise<DailyRow[]> {
     etcCorp: num(r[20]),
     etcForeign: num(r[21]),
     etcTotal: num(r[22]),
+    shares: r[23] ? num(r[23]) : null,
   }));
 }
 
@@ -327,6 +329,7 @@ export type WeeklyChartPoint = {
   high: number;
   low: number;
   close: number;
+  volume: number | null;
 };
 
 export async function getWeeklyChartData(): Promise<WeeklyChartPoint[]> {
@@ -352,6 +355,7 @@ export async function getWeeklyChartData(): Promise<WeeklyChartPoint[]> {
     high: num(r[4]),
     low: num(r[5]),
     close: num(r[6]),
+    volume: r[7] ? num(r[7]) : null,
   }));
 }
 
