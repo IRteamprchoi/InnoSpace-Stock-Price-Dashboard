@@ -153,17 +153,23 @@ export default function MonthlyDashboard({
             const closeDate = dailyPoints[dailyPoints.length - 1].date;
             const openDailyRow = dailyRows.find((r) => r.d === openDate);
             const closeDailyRow = dailyRows.find((r) => r.d === closeDate);
-            if (openDailyRow?.mcap != null && closeDailyRow?.mcap != null && openDailyRow.close) {
-              const openShares = Math.round(openDailyRow.mcap / openDailyRow.close);
+            if (openDailyRow?.shares != null && closeDailyRow?.shares != null) {
+              const openMcap2 = snap.openClose != null ? snap.openClose * openDailyRow.shares : null;
+              const closeMcap2 = snap.closeClose != null ? snap.closeClose * closeDailyRow.shares : null;
               snap = {
                 ...snap,
-                shares: Math.round(closeDailyRow.mcap / closeDailyRow.close),
-                openMarketCap: openDailyRow.mcap,
-                closeMarketCap: closeDailyRow.mcap,
-                marketCapChange: closeDailyRow.mcap - openDailyRow.mcap,
+                shares: closeDailyRow.shares,
+                sharesOpen: openDailyRow.shares,
+                sharesDataInsufficient: false,
+                openMarketCap: openMcap2 ?? snap.openMarketCap,
+                closeMarketCap: closeMcap2 ?? snap.closeMarketCap,
+                marketCapChange:
+                  openMcap2 != null && closeMcap2 != null ? closeMcap2 - openMcap2 : snap.marketCapChange,
               };
+            } else {
+              snap = { ...snap, sharesOpen: null, sharesDataInsufficient: true };
             }
-          } else if (
+} else if (
             openSharesRow?.shares != null &&
             closeSharesRow?.shares != null &&
             snap.openClose != null &&
@@ -243,13 +249,15 @@ export default function MonthlyDashboard({
 
   // 발행주식수 월초 대비 정확한 증감 수량
   const sharesDiff = (() => {
-    const rows = priceRows
-      .filter((r) => r.name === "이노스페이스" && r.refFriday.startsWith(month))
-      .sort((a, b) => a.refFriday.localeCompare(b.refFriday));
+    // daily_data의 일별 상장주식수(shares, KIS lstn_stcn 1주 단위)만 신뢰한다.
+    // weekly_prices(매주 금요일 스냅샷)는 실제 월초(첫 거래일)를 담지 못해
+    // "이번 달 첫 금요일"을 월초로 오인하는 오류가 있었으므로 더 이상 사용하지 않는다.
+    const rows = dailyRows
+      .filter((r) => r.d.startsWith(month) && r.shares != null)
+      .sort((a, b) => a.d.localeCompare(b.d));
     if (rows.length < 2) return null;
-    const first = rows[0].shares;
-    const last = rows[rows.length - 1].shares;
-    if (first == null || last == null) return null;
+    const first = rows[0].shares as number;
+    const last = rows[rows.length - 1].shares as number;
     return last - first;
   })();
 
@@ -634,6 +642,8 @@ type CompanySnapshot = {
   monthHigh: number | null;
   monthLow: number | null;
   weeklyCloses: number[];
+  sharesOpen?: number | null;
+  sharesDataInsufficient?: boolean;
 };
 
 function buildSnapshot(rows: WeeklyPriceRow[], name: string, month: string): CompanySnapshot | null {
