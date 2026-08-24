@@ -1654,8 +1654,8 @@ function scoreArticle(a: WeeklyNewsRow): number {
 function selectTopArticles(articles: WeeklyNewsRow[]): WeeklyNewsRow[] {
   // 1) 포토뉴스·영상뉴스 등 내용 없는 기사, 단순 시황("주가 올랐다" 류) 기사 제외
   const isLowQuality = (title: string) =>
-    /\[?(포토|사진|영상)\]?/.test(title) ||
-    /^\[포토\]|\(사진\)|\(영상\)/.test(title) ||
+    /\[?(포토|사진|현장사진|시험장면|영상)\]?/.test(title) ||
+    /^\[포토\]|\(사진\)|\(현장사진\)|\(영상\)/.test(title) ||
     /주가.{0,4}(올랐다|상승했다|급등했다)\.?$/.test(title.trim());
   const qualityFiltered = articles.filter((a) => !isLowQuality(a.title));
 
