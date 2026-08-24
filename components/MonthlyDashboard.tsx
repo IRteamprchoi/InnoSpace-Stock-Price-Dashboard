@@ -132,7 +132,20 @@ export default function MonthlyDashboard({
           const closeSharesRow = inMonthRows[inMonthRows.length - 1];
 
           // 당사(이노스페이스)는 daily_data(일간 페이지 원본, 읽기 전용)에 그날그날의 정확한
-          // 시가총액이 있다. 시가총액 = 그날 상장주식수 × 그날 종가로 KIS가 이미 계산해 준 값이므로,
+          // 시가총액이 있다. 시가총액 = 그날 상장주식수 × 그날 종가로 KIS가 이미 계산해 준 값이므로,          // 국내(당사·피어) 공통: weekly_chart_data에 실제 일별 거래량이 있으면(신규 수집분)
+          // 겹치는 주간 리포트를 재합산하는 대신 일별 거래량을 직접 합산한다(중복·재합산 방지).
+          if (!isUsCompany && weeklySnap?.code) {
+            const monthChartRows = chartRows.filter(
+              (r) => r.code === weeklySnap.code && r.date.startsWith(month) && r.volume != null
+            );
+            if (monthChartRows.length > 0) {
+              const seen = new Map<string, number>();
+              monthChartRows.forEach((r) => seen.set(r.date, r.volume as number));
+              const sumVol = Array.from(seen.values()).reduce((s, v) => s + v, 0);
+              snap = { ...snap, monthVolume: sumVol };
+            }
+          }
+
           // 역으로 나누면 근사치가 아니라 그날 KIS가 실제로 사용한 정확한 상장주식수가 나온다.
           // (국내 피어그룹은 이런 일별 소스가 없어 주간 리포트 스냅샷을 계속 사용한다.)
           if (c.group === "self" && dailyPoints.length >= 2) {
