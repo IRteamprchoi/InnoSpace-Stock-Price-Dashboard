@@ -309,7 +309,8 @@ export default function MonthlyDashboard({
     // 주차별 시장 시황: 제목만으로 이해 가능한 기사만 선별하고, 주차당 최대 2건(국내1+미국1)만 남긴다.
   // 주차 계산: 해당 월의 첫 영업일(월~금)이 포함된 일요일~토요일 구간을 1주차로 정의.
 // 순수 캘린더 날짜 문자열 연산만 사용해 Asia/Seoul 기준 날짜가 UTC 변환으로 밀리지 않게 한다.
-function getKoreanWeekNumber(dateStr: string, month: string): number {
+function getKoreanWeekNumber(dateStr: string, month: string): number | null {
+  if (!dateStr || dateStr.length < 10) return null;
   const [y, m] = month.split("-").map(Number);
   let firstBizTime = Date.UTC(y, m - 1, 1);
   let dow = new Date(firstBizTime).getUTCDay();
@@ -321,7 +322,8 @@ function getKoreanWeekNumber(dateStr: string, month: string): number {
   const [ty, tm, td] = dateStr.slice(0, 10).split("-").map(Number);
   const targetTime = Date.UTC(ty, tm - 1, td);
   const diffDays = Math.floor((targetTime - weekStartSundayTime) / 86400000);
-  return Math.floor(diffDays / 7) + 1;
+  const result = Math.floor(diffDays / 7) + 1;
+  return Number.isFinite(result) ? result : null;
 }
 const marketWeeklyGroups = useMemo(() => {
     const isGenericTitle = (title: string) =>
@@ -332,6 +334,7 @@ const marketWeeklyGroups = useMemo(() => {
     const byWeek = new Map<number, typeof deduped>();
     deduped.forEach((r) => {
       const weekNum = getKoreanWeekNumber(r.pubDate, month);
+      if (weekNum == null) return;
       byWeek.set(weekNum, [...(byWeek.get(weekNum) ?? []), r]);
     });
 
