@@ -453,16 +453,18 @@ const marketWeeklyGroups = useMemo(() => {
       <section className="space-y-2">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
           <SummaryPanel title="월초 대비 주가 등락률">
-            <p className={`text-xl font-semibold tabular-nums ${toneColor(toneOf(selfChangePct))}`}>
-              당사 {pctText(selfChangePct)}
-            </p>
-            <div className="mt-1.5 space-y-0.5">
-              <p className="text-[11px] text-slate-400 whitespace-nowrap">
-                코스닥 대비 <span className="tabular-nums">{pctPointText(excessVsKosdaq)}</span>
+            <div className="flex items-center justify-between gap-3">
+              <p className={`text-xl font-semibold tabular-nums ${toneColor(toneOf(selfChangePct))}`}>
+                당사 {pctText(selfChangePct)}
               </p>
-              <p className="text-[11px] text-slate-400 whitespace-nowrap">
-                피어그룹 평균 대비 <span className="tabular-nums">{pctPointText(excessVsPeerAvg)}</span>
-              </p>
+              <div className="space-y-0.5 text-right">
+                <p className="text-[11px] text-slate-400 whitespace-nowrap">
+                  코스닥 대비 <span className="tabular-nums">{pctPointText(excessVsKosdaq)}</span>
+                </p>
+                <p className="text-[11px] text-slate-400 whitespace-nowrap">
+                  피어그룹 평균 대비 <span className="tabular-nums">{pctPointText(excessVsPeerAvg)}</span>
+                </p>
+              </div>
             </div>
           </SummaryPanel>
 
@@ -531,14 +533,14 @@ const marketWeeklyGroups = useMemo(() => {
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-300 font-semibold">월간 총거래량</p>
-                  <p className="text-[13px] font-medium text-slate-200 tabular-nums">
+                  <p className="text-[10px] text-slate-500 font-medium">월간 총거래량</p>
+                  <p className="text-[13px] font-semibold text-slate-100 tabular-nums">
                     {fmtVolume(selfRow?.snap?.monthVolume ?? null)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-300 font-semibold">일평균 거래량</p>
-                  <p className="text-[13px] font-medium text-slate-200 tabular-nums">
+                  <p className="text-[10px] text-slate-500 font-medium">일평균 거래량</p>
+                  <p className="text-[13px] font-semibold text-slate-100 tabular-nums">
                     {avgDailyVolume != null ? avgDailyVolume.toLocaleString("ko-KR") + "주" : "-"}
                   </p>
                 </div>
@@ -832,7 +834,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function SummaryPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-slate-900/70 border border-slate-700 rounded-xl px-4 py-3">
-      <p className="text-[11px] text-slate-300 font-semibold mb-1.5">{title}</p>
+      <p className="text-[13px] text-slate-200 font-semibold mb-1.5">{title}</p>
       {children}
     </div>
   );
@@ -1165,9 +1167,9 @@ function MiniStatCard({ label, value }: { label: string; value: string }) {
 function FlowStatCard({ label, value }: { label: string; value: number }) {
   const color = value > 0 ? "text-red-400" : value < 0 ? "text-blue-400" : "text-slate-400";
   return (
-    <div className="bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2">
-      <p className="text-[10px] text-slate-300 font-semibold">{label}</p>
-      <p className={`text-[14px] font-semibold tabular-nums ${color}`}>{fmtFlow(value)}</p>
+    <div className="bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+      <p className="text-[10px] text-slate-300 font-semibold shrink-0">{label}</p>
+      <p className={`text-[14px] font-semibold tabular-nums text-right ${color}`}>{fmtFlow(value)}</p>
     </div>
   );
 }
@@ -1245,10 +1247,7 @@ function CompanyDetail({
           <div className="bg-slate-900/60 border border-slate-700 rounded-lg px-2.5 py-2">
             <p className="text-[10px] text-slate-300 font-semibold">시가총액 변화</p>
             <p className="text-[12px] font-medium text-slate-200 tabular-nums leading-tight mt-0.5 whitespace-nowrap">
-              {fmtMarketCapKrw(snap.openMarketCap)} →
-            </p>
-            <p className="text-[12px] font-medium text-slate-200 tabular-nums leading-tight">
-              {fmtMarketCapKrw(snap.closeMarketCap)}
+              {fmtMarketCapKrw(snap.openMarketCap)} → {fmtMarketCapKrw(snap.closeMarketCap)}
             </p>
             <p className={`text-[11px] font-semibold tabular-nums mt-0.5 ${toneColor(toneOf(snap.marketCapChange))}`}>
               {snap.marketCapChange != null
@@ -1271,7 +1270,7 @@ function CompanyDetail({
               해당 종목은 투자자별 매매동향 데이터가 제공되지 않습니다.
             </p>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-1.5">
               <FlowStatCard label="개인" value={flow.individual} />
               <FlowStatCard label="외국인" value={flow.foreign} />
               <FlowStatCard label="기관" value={flow.institution} />
