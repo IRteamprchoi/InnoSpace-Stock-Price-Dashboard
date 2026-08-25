@@ -1575,18 +1575,25 @@ function DailyCompareChart({ kospi, kosdaq }: { kospi: ChartPoint[]; kosdaq: Cha
   const dayTicks = merged.filter((_, i) => i % step === 0 || i === merged.length - 1).map((r) => r.date);
 
   const EndLabel = (props: any) => {
-    const { x, y, index, dataKey } = props;
-    if (index !== lastIdx) return null;
+    const { cx, cy, index, dataKey } = props;
+    if (index !== lastIdx || cx == null || cy == null) return null;
     const val = dataKey === "kospi" ? kospiEnd : kosdaqEnd;
     const color = val > 0 ? "#f87171" : val < 0 ? "#60a5fa" : "#94a3b8";
     const dy = dataKey === "kospi" ? kospiDy : kosdaqDy;
     const label = `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`;
+    const boxW = label.length * 7 + 12;
+    const boxH = 18;
+    const bx = cx + 8;
+    const by = cy + dy - boxH / 2;
     return (
-      <text x={x + 6} y={y + dy} dy={4} fontSize={11} fontWeight={600} fill={color} textAnchor="start">
-        {label}
-      </text>
+      <g>
+        <rect x={bx} y={by} width={boxW} height={boxH} rx={4} fill={color} />
+        <text x={bx + boxW / 2} y={by + boxH / 2} dy={4} fontSize={11} fontWeight={700} fill="#ffffff" textAnchor="middle">
+          {label}
+        </text>
+      </g>
     );
-  };
+  };;
 
   return (
     <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-3.5">
@@ -1598,7 +1605,7 @@ function DailyCompareChart({ kospi, kosdaq }: { kospi: ChartPoint[]; kosdaq: Cha
         </div>
       </div>
       <ResponsiveContainer width="100%" height={190}>
-        <ComposedChart data={merged} margin={{ top: 4, right: 58, left: 0, bottom: 0 }}>
+        <ComposedChart data={merged} margin={{ top: 4, right: 72, left: 0, bottom: 0 }}>
           <XAxis
             dataKey="date"
             ticks={dayTicks}
