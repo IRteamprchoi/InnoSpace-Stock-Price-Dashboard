@@ -327,7 +327,7 @@ export default function MonthlyDashboard({
     const flowNote =
       flowEntries.length > 0
         ? flowEntries
-            .map((f) => `${f.label}${f.label === "코스닥" ? "는" : "은"} ${f.value > 0 ? "순매수" : f.value < 0 ? "순매도" : "보합"}`)
+            .map((f) => `${f.label}${(((f.label.charCodeAt(f.label.length-1)-0xAC00)%28===0)?"는":"은")} ${f.value > 0 ? "순매수" : f.value < 0 ? "순매도" : "보합"}`)
             .join(", ")
         : "";
     const line1 = `당사는 코스닥 대비 ${excessVsKosdaq >= 0 ? "+" : ""}${excessVsKosdaq.toFixed(
