@@ -487,7 +487,7 @@ const marketWeeklyGroups = useMemo(() => {
           </SummaryPanel>
 
           <SummaryPanel title="시가총액 변화">
-            <p className="text-[13px] text-slate-200 tabular-nums">
+            <p className="text-[13px] text-slate-200 tabular-nums whitespace-nowrap">
               {fmtMarketCapKrw(selfRow?.snap?.openMarketCap ?? null)} →{" "}
               {fmtMarketCapKrw(selfRow?.snap?.closeMarketCap ?? null)}
             </p>
@@ -831,9 +831,9 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function SummaryPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-slate-900/70 border border-slate-700 rounded-xl px-4 py-3">
-      <p className="text-[11px] text-slate-300 font-semibold mb-1.5">{title}</p>
-      {children}
+    <div className="bg-slate-900/70 border border-slate-700 rounded-xl px-4 py-2 flex items-center justify-between gap-3">
+      <p className="text-[11px] text-slate-300 font-semibold shrink-0">{title}</p>
+      <div className="text-right min-w-0">{children}</div>
     </div>
   );
 }
