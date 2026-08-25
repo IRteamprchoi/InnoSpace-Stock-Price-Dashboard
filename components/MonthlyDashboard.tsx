@@ -1155,9 +1155,9 @@ function PeerMonthlyTable({
 
 function MiniStatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2">
-      <p className="text-[10px] text-slate-300 font-semibold">{label}</p>
-      <p className="text-[14px] font-semibold text-slate-200 tabular-nums">{value}</p>
+    <div className="bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+      <p className="text-[10px] text-slate-300 font-semibold shrink-0">{label}</p>
+      <p className="text-[14px] font-semibold text-slate-200 tabular-nums text-right">{value}</p>
     </div>
   );
 }
@@ -1244,7 +1244,7 @@ function CompanyDetail({
           <MiniStatCard label="월중 최저가" value={fmtPrice(snap.monthLow, isUs)} />
           <div className="bg-slate-900/60 border border-slate-700 rounded-lg px-2.5 py-2">
             <p className="text-[10px] text-slate-300 font-semibold">시가총액 변화</p>
-            <p className="text-[12px] font-medium text-slate-200 tabular-nums leading-tight mt-0.5">
+            <p className="text-[12px] font-medium text-slate-200 tabular-nums leading-tight mt-0.5 whitespace-nowrap">
               {fmtMarketCapKrw(snap.openMarketCap)} →
             </p>
             <p className="text-[12px] font-medium text-slate-200 tabular-nums leading-tight">
