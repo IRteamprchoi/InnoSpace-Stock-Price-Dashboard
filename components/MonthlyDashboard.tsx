@@ -1308,7 +1308,7 @@ function CompanyDetail({
             </span>
           )}
         </p>
-        <DailyPriceChart points={dailyPoints} isUs={isUs} height={270} />
+        <DailyPriceChart points={dailyPoints} isUs={isUs} height={180} />
       </div>
     </div>
   );
