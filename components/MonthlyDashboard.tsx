@@ -426,6 +426,20 @@ const marketWeeklyGroups = useMemo(() => {
     return dates.length ? dates.sort().reverse()[0] : null;
   }, [usHistoryRows, month]);
 
+  // 국내/미국 각 시장의 월초·월말 실제 거래일 (데이터 날짜 기준, 시장별 독립 계산)
+  const domesticDates = useMemo(
+    () => kospiRows.map((r) => r.date).filter((d) => d.startsWith(month)).sort(),
+    [kospiRows, month]
+  );
+  const usDates = useMemo(
+    () => usHistoryRows.map((r) => r.date).filter((d) => d.startsWith(month)).sort(),
+    [usHistoryRows, month]
+  );
+  const domesticStartDate = domesticDates.length ? domesticDates[0] : null;
+  const domesticEndDate = domesticDates.length ? domesticDates[domesticDates.length - 1] : null;
+  const usStartDate = usDates.length ? usDates[0] : null;
+  const usEndDate = usDates.length ? usDates[usDates.length - 1] : null;
+
   const latestFx = tableRows
     .filter((r) => r.group === "us" && r.snap?.fxRate != null)
     .map((r) => r.snap!)
@@ -441,9 +455,13 @@ const marketWeeklyGroups = useMemo(() => {
               진행 중 · 최신 거래일 기준
             </span>
           )}
-          <span className="ml-2 text-[11px] text-slate-500">
-            국내 {latestDomesticDate ?? "-"} 종가
-            {latestUsDate && ` · 미국 ${latestUsDate} 종가`}
+          <span className="ml-2 text-[11px] text-slate-500 inline-flex flex-col gap-0.5 align-top">
+            <span>
+              국내 월초 기준일 {domesticStartDate ?? "-"} · 월말 기준일 {domesticEndDate ?? "-"}
+            </span>
+            <span>
+              미국 월초 기준일 {usStartDate ?? "-"} · 월말 기준일 {usEndDate ?? "-"}
+            </span>
           </span>
         </p>
         <MonthSelector month={month} availableMonths={availableMonths} />
@@ -533,13 +551,13 @@ const marketWeeklyGroups = useMemo(() => {
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-500 font-medium">월간 총거래량</p>
+                  <p className="text-[10px] text-slate-300 font-semibold">월간 총거래량</p>
                   <p className="text-[13px] font-semibold text-slate-100 tabular-nums">
                     {fmtVolume(selfRow?.snap?.monthVolume ?? null)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-500 font-medium">일평균 거래량</p>
+                  <p className="text-[10px] text-slate-300 font-semibold">일평균 거래량</p>
                   <p className="text-[13px] font-semibold text-slate-100 tabular-nums">
                     {avgDailyVolume != null ? avgDailyVolume.toLocaleString("ko-KR") + "주" : "-"}
                   </p>
@@ -738,7 +756,7 @@ function buildInnospaceFlowFromDaily(rows: DailyRow[], month: string): FlowSumma
 }
 
 function buildFlowSummary(rows: DomesticInvestorFlowRow[], code: string, month: string): FlowSummary | null {
-  const companyRows = rows.filter((r) => r.code === code && r.date.startsWith(month));
+  const companyRows = rows.filter((r) => String(r.code).replace(/^0+/, "") === String(code).replace(/^0+/, "") && r.date.startsWith(month));
   if (companyRows.length === 0) return null;
   return {
     individual: companyRows.reduce((s, r) => s + r.individual, 0),
@@ -1270,7 +1288,7 @@ function CompanyDetail({
               해당 종목은 투자자별 매매동향 데이터가 제공되지 않습니다.
             </p>
           ) : (
-            <div className="grid grid-cols-1 gap-1.5">
+            <div className="grid grid-cols-2 gap-2">
               <FlowStatCard label="개인" value={flow.individual} />
               <FlowStatCard label="외국인" value={flow.foreign} />
               <FlowStatCard label="기관" value={flow.institution} />
@@ -1406,7 +1424,7 @@ function buildCompanyDailyPoints(
   // 동일 날짜가 여러 report_date에 중복 저장될 수 있어(재실행 등), 날짜별로 1건만 사용
   const byDate = new Map<string, { close: number; high: number; low: number }>();
   chartRows
-    .filter((r) => r.code === code && r.date.startsWith(month))
+    .filter((r) => String(r.code).replace(/^0+/, "") === String(code).replace(/^0+/, "") && r.date.startsWith(month))
     .forEach((r) => byDate.set(r.date, { close: r.close, high: r.high, low: r.low }));
   return Array.from(byDate.entries())
     .sort(([a], [b]) => a.localeCompare(b))
@@ -1578,10 +1596,10 @@ function DailyCompareChart({ kospi, kosdaq }: { kospi: ChartPoint[]; kosdaq: Cha
     const { cx, cy, index, dataKey } = props;
     if (index !== lastIdx || cx == null || cy == null) return null;
     const val = dataKey === "kospi" ? kospiEnd : kosdaqEnd;
-    const color = val > 0 ? "#f87171" : val < 0 ? "#60a5fa" : "#94a3b8";
+    const color = dataKey === "kospi" ? "#f87171" : "#60a5fa";
     const dy = dataKey === "kospi" ? kospiDy : kosdaqDy;
     const label = `${val >= 0 ? "+" : ""}${val.toFixed(2)}%`;
-    const boxW = label.length * 7 + 12;
+    const boxW = 54;
     const boxH = 18;
     const bx = cx + 8;
     const by = cy + dy - boxH / 2;
@@ -1593,7 +1611,7 @@ function DailyCompareChart({ kospi, kosdaq }: { kospi: ChartPoint[]; kosdaq: Cha
         </text>
       </g>
     );
-  };;
+  };;;
 
   return (
     <div className="bg-slate-900/70 border border-slate-700 rounded-xl p-3.5">
