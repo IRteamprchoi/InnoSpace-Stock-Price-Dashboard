@@ -428,8 +428,15 @@ const marketWeeklyGroups = useMemo(() => {
 
   // 국내/미국 각 시장의 월초·월말 실제 거래일 (데이터 날짜 기준, 시장별 독립 계산)
   const domesticDates = useMemo(
-    () => kospiRows.map((r) => r.date).filter((d) => d.startsWith(month)).sort(),
-    [kospiRows, month]
+    () =>
+      Array.from(
+        new Set(
+          chartRows
+            .filter((r) => /^\d/.test(String(r.code)) && r.date && r.date.startsWith(month))
+            .map((r) => r.date)
+        )
+      ).sort(),
+    [chartRows, month]
   );
   const usDates = useMemo(
     () => usHistoryRows.map((r) => r.date).filter((d) => d.startsWith(month)).sort(),
