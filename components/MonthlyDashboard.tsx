@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useMemo, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import {
   ComposedChart,
@@ -75,6 +75,58 @@ export default function MonthlyDashboard({
   dailyRows,
   availableMonths,
 }: MonthlyDashboardProps) {
+  // ── 월간 보고서 공개 게이팅 ─────────────────────────────
+  // 데이터는 매일/매주 계속 쌓이되, 화면 기본 표시 월은 "직전에 완전히 끝난 월"만 보여준다.
+  // 전환 시점: 다음 달의 첫 영업일(한국 공휴일 반영) 오전 9시(KST). 그 전까지는 이전 월을 유지.
+  const router_ = useRouter();
+  const searchParams_ = useSearchParams();
+  useEffect(() => {
+    // 사용자가 드롭다운 등으로 월을 직접 지정한 경우(URL ?month=)는 건드리지 않는다.
+    if (searchParams_.get("month")) return;
+
+    const REPORTING_START = "2026-08";
+    const HOLIDAYS = new Set<string>([
+      // 2026 대한민국 공휴일 (음력 반영)
+      "2026-01-01","2026-02-16","2026-02-17","2026-02-18","2026-03-01","2026-03-02",
+      "2026-05-05","2026-05-24","2026-05-25","2026-06-06","2026-08-15","2026-08-17",
+      "2026-09-24","2026-09-25","2026-09-26","2026-10-03","2026-10-05","2026-10-09",
+      "2026-12-25",
+    ]);
+    // 특정 연-월(ym="YYYY-MM")의 첫 영업일(주말/공휴일 제외) "YYYY-MM-DD"
+    const firstBusinessDay = (ym: string): string => {
+      for (let d = 1; d <= 15; d++) {
+        const dd = String(d).padStart(2, "0");
+        const dateStr = `${ym}-${dd}`;
+        const dow = new Date(`${dateStr}T00:00:00+09:00`).getUTCDay(); // 0=일,6=토 (KST 자정 기준)
+        if (dow === 0 || dow === 6) continue;
+        if (HOLIDAYS.has(dateStr)) continue;
+        return dateStr;
+      }
+      return `${ym}-01`;
+    };
+    // 현재 KST 시각
+    const nowKstMs = Date.now(); // 절대 시각. 아래 비교는 KST 기준 문자열로 수행
+    // KST 연/월 계산
+    const kstNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    const curYm = `${kstNow.getFullYear()}-${String(kstNow.getMonth() + 1).padStart(2, "0")}`;
+    // 이번 달 첫 영업일 09:00 KST
+    const fbd = firstBusinessDay(curYm);
+    const gateMs = new Date(`${fbd}T09:00:00+09:00`).getTime();
+    const prevYm = (ym: string): string => {
+      let [y, m] = ym.split("-").map(Number);
+      m -= 1; if (m === 0) { m = 12; y -= 1; }
+      return `${y}-${String(m).padStart(2, "0")}`;
+    };
+    // 이번 달 첫 영업일 09시를 지났으면 전월, 아니면 전전월 공개
+    let published = nowKstMs >= gateMs ? prevYm(curYm) : prevYm(prevYm(curYm));
+    if (published < REPORTING_START) published = REPORTING_START;
+    // 기본 진입인데 현재 표시 월이 공개월과 다르면(주로 더 최신이면) 공개월로 교체
+    if (month !== published) {
+      router_.replace(`/monthly?month=${published}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month]);
+
   const monthLabel = `${month.slice(0, 4)}년 ${Number(month.slice(5, 7))}월`;
   const isCurrentMonth = month === new Date().toISOString().slice(0, 7);
   const [newsFilter, setNewsFilter] = useState<"전체" | "이노스페이스" | "해외 피어그룹" | "국내 피어그룹">("전체");
