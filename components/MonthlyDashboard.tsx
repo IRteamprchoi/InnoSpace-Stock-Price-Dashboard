@@ -396,38 +396,44 @@ export default function MonthlyDashboard({
 // 순수 캘린더 날짜 문자열 연산만 사용해 Asia/Seoul 기준 날짜가 UTC 변환으로 밀리지 않게 한다.
 function getKoreanWeekNumber(dateStr: string, month: string): number | null {
   if (!dateStr) return null;
-  // pubDate는 RSS 원본 형식(예: "Fri, 07 Aug 2026 02:35:00 GMT")일 수 있어
-  // Date 파싱 후 KST(UTC+9)로 명시적으로 환산해 캘린더 날짜를 구한다(UTC 변환으로 날짜가 밀리지 않도록).
+  // pubDate는 RSS 발행 형식(예: "Fri, 07 Aug 2026 02:35:00 GMT")일 수 있어
+  // Date 파싱 후 KST(UTC+9) 기준 날짜로 해석한다.
   const parsed = new Date(dateStr);
-  if (Number.isNaN(parsed.getTime())) return null;
-  const kstTime = parsed.getTime() + 9 * 60 * 60 * 1000;
-  const kst = new Date(kstTime);
+  if (isNaN(parsed.getTime())) return null;
+  const kst = new Date(parsed.getTime() + 9 * 60 * 60 * 1000);
   const [y, m] = month.split("-").map(Number);
-  let firstBizTime = Date.UTC(y, m - 1, 1);
-  let dow = new Date(firstBizTime).getUTCDay();
-  while (dow === 0 || dow === 6) {
-    firstBizTime += 86400000;
-    dow = new Date(firstBizTime).getUTCDay();
+  // 해당 월의 첫 번째 월요일(UTC 기준, 날짜 계산용)
+  let firstMonTime = Date.UTC(y, m - 1, 1);
+  let dow = new Date(firstMonTime).getUTCDay(); // 0=일 … 1=월 … 6=토
+  while (dow !== 1) {
+    firstMonTime += 24 * 60 * 60 * 1000;
+    dow = new Date(firstMonTime).getUTCDay();
   }
-  const weekStartSundayTime = firstBizTime - dow * 86400000;
-  const targetTime = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());
-  const diffDays = Math.floor((targetTime - weekStartSundayTime) / 86400000);
+  // 뉴스 날짜(KST)의 자정 UTC 표현
+  const dUtc = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());
+  // 다른 달의 뉴스는 제외
+  if (kst.getUTCFullYear() !== y || kst.getUTCMonth() !== m - 1) return null;
+  const diffDays = Math.floor((dUtc - firstMonTime) / (24 * 60 * 60 * 1000));
+  // 첫 월요일 이전(예: 8/1 토, 8/2 일)은 주차에 포함하지 않음
+  if (diffDays < 0) return null;
   const result = Math.floor(diffDays / 7) + 1;
   return Number.isFinite(result) ? result : null;
 }
 const marketWeeklyGroups = useMemo(() => {
     const isGenericTitle = (title: string) =>
       /^\[오늘의증시\]|오늘의\s*증시|^\d[\d.,\s]*$/.test(title.trim());
-    // report_date(주차)별 그룹핑 → 각 주차에서 KR 1건 + US 1건 대표 선정
+    // 그 달의 시장뉴스 후보 (제네릭/저품질 제외)
     const monthRows = marketNewsRows.filter(
-      (r) => r.reportDate.startsWith(month) && !isGenericTitle(r.title) && !isLowQuality(r.title)
+      (r) => !isGenericTitle(r.title) && !isLowQuality(r.title)
     );
-    // report_date별로 모으기
-    const byReport = new Map<string, MarketNewsRow[]>();
+    // pubDate(실제 발행일) 기준 주차(첫 월요일 포함 주=1주차)로 그룹핑
+    const byWeek = new Map<number, MarketNewsRow[]>();
     monthRows.forEach((r) => {
-      byReport.set(r.reportDate, [...(byReport.get(r.reportDate) ?? []), r]);
+      const wk = getKoreanWeekNumber(r.pubDate, month);
+      if (wk == null) return;
+      byWeek.set(wk, [...(byWeek.get(wk) ?? []), r]);
     });
-    // 시장별 대표 1건 선정: scoreArticle(=outlet_count 반영) DESC → pubDate DESC
+    // 주차 내 시장별 대표 1건: 링크·제목 중복 제거 → scoreArticle DESC → pubDate DESC
     const pickBest = (rows: MarketNewsRow[], mkt: string): MarketNewsRow | null => {
       const cand = dedupeByLink(rows.filter((r) => r.market === mkt));
       const seen = new Set<string>();
@@ -438,21 +444,20 @@ const marketWeeklyGroups = useMemo(() => {
         return true;
       });
       uniq.sort((a, b) => {
-        const s = scoreArticle(b as unknown as WeeklyNewsRow) - scoreArticle(a as unknown as WeeklyNewsRow);
-        if (s !== 0) return s;
+        const sc = scoreArticle(b as unknown as WeeklyNewsRow) - scoreArticle(a as unknown as WeeklyNewsRow);
+        if (sc !== 0) return sc;
         return b.pubDate.localeCompare(a.pubDate);
       });
       return uniq[0] ?? null;
     };
-    // report_date 오름차순 → 주차 번호 부여
-    return Array.from(byReport.keys())
-      .sort((a, b) => a.localeCompare(b))
-      .map((reportDate, idx) => {
-        const rows = byReport.get(reportDate)!;
+    return Array.from(byWeek.keys())
+      .sort((a, b) => a - b)
+      .map((weekNum) => {
+        const rows = byWeek.get(weekNum)!;
         const kr = pickBest(rows, "KR");
         const us = pickBest(rows, "US");
         const items = [kr, us].filter((x): x is NonNullable<typeof x> => !!x);
-        return { weekNum: idx + 1, items };
+        return { weekNum, items };
       })
       .filter((g) => g.items.length > 0);
   }, [marketNewsRows, month]);
@@ -484,7 +489,7 @@ const marketWeeklyGroups = useMemo(() => {
       COMPANY_ORDER.map((c) => ({
         name: c.name,
         group: c.group,
-        articles: selectTopArticles(newsInMonth(companyNewsRows, month).filter((r) => r.name === c.name)),
+        articles: selectTopArticles(newsInMonth(companyNewsRows, month).filter((r) => r.name === c.name), month),
       })),
     [companyNewsRows, month]
   );
@@ -1787,7 +1792,7 @@ function scoreArticle(a: WeeklyNewsRow): number {
   return score;
 }
 
-function selectTopArticles(articles: WeeklyNewsRow[]): WeeklyNewsRow[] {
+function selectTopArticles(articles: WeeklyNewsRow[], month: string): WeeklyNewsRow[] {
   // 1) 포토뉴스·영상뉴스 등 내용 없는 기사, 단순 시황("주가 올랐다" 류) 기사 제외
   const isLowQuality = (title: string) => {
     const t = title.trim();
@@ -1822,12 +1827,15 @@ function selectTopArticles(articles: WeeklyNewsRow[]): WeeklyNewsRow[] {
   );
 
   // 5) 동일 주차(같은 report_date) 기사는 최대 2건까지만, 전체 최대 4건
-  const weekCounts = new Map<string, number>();
+  const weekCounts = new Map<number, number>();
   const result: WeeklyNewsRow[] = [];
   for (const a of sorted) {
-    const count = weekCounts.get(a.reportDate) ?? 0;
+    // pubDate(실제 발행일) 기준 주차(첫 월요일 포함 주=1주차)로 그룹핑, 주차당 1건
+    const wk = getKoreanWeekNumber(a.pubDate, month);
+    if (wk == null) continue;
+    const count = weekCounts.get(wk) ?? 0;
     if (count >= 1) continue;
-    weekCounts.set(a.reportDate, count + 1);
+    weekCounts.set(wk, count + 1);
     result.push(a);
   }
   return result;
