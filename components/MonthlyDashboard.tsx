@@ -417,24 +417,42 @@ function getKoreanWeekNumber(dateStr: string, month: string): number | null {
 }
 const marketWeeklyGroups = useMemo(() => {
     const isGenericTitle = (title: string) =>
-      /^\[오늘의증시\]|오늘의\s*코스피|오늘의\s*증시|^\d[\d.,\s]*$/.test(title.trim());
-    const monthRows = marketNewsRows.filter((r) => r.reportDate.startsWith(month) && !isGenericTitle(r.title));
-    const deduped = dedupeByLink(monthRows);
-
-    const byWeek = new Map<number, typeof deduped>();
-    deduped.forEach((r) => {
-      const weekNum = getKoreanWeekNumber(r.pubDate, month);
-      if (weekNum == null) return;
-      byWeek.set(weekNum, [...(byWeek.get(weekNum) ?? []), r]);
+      /^\[오늘의증시\]|오늘의\s*증시|^\d[\d.,\s]*$/.test(title.trim());
+    // report_date(주차)별 그룹핑 → 각 주차에서 KR 1건 + US 1건 대표 선정
+    const monthRows = marketNewsRows.filter(
+      (r) => r.reportDate.startsWith(month) && !isGenericTitle(r.title) && !isLowQuality(r.title)
+    );
+    // report_date별로 모으기
+    const byReport = new Map<string, MarketNewsRow[]>();
+    monthRows.forEach((r) => {
+      byReport.set(r.reportDate, [...(byReport.get(r.reportDate) ?? []), r]);
     });
-
-    return Array.from(byWeek.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([weekNum, items]) => {
-        const kr = items.find((r) => r.market === "KR");
-        const us = items.find((r) => r.market === "US");
-        const picked = [kr, us].filter((x): x is NonNullable<typeof x> => !!x);
-        return { weekNum, items: picked };
+    // 시장별 대표 1건 선정: scoreArticle(=outlet_count 반영) DESC → pubDate DESC
+    const pickBest = (rows: MarketNewsRow[], mkt: string): MarketNewsRow | null => {
+      const cand = dedupeByLink(rows.filter((r) => r.market === mkt));
+      const seen = new Set<string>();
+      const uniq = cand.filter((r) => {
+        const k = normalizeTitle(r.title);
+        if (k && seen.has(k)) return false;
+        if (k) seen.add(k);
+        return true;
+      });
+      uniq.sort((a, b) => {
+        const s = scoreArticle(b as unknown as WeeklyNewsRow) - scoreArticle(a as unknown as WeeklyNewsRow);
+        if (s !== 0) return s;
+        return b.pubDate.localeCompare(a.pubDate);
+      });
+      return uniq[0] ?? null;
+    };
+    // report_date 오름차순 → 주차 번호 부여
+    return Array.from(byReport.keys())
+      .sort((a, b) => a.localeCompare(b))
+      .map((reportDate, idx) => {
+        const rows = byReport.get(reportDate)!;
+        const kr = pickBest(rows, "KR");
+        const us = pickBest(rows, "US");
+        const items = [kr, us].filter((x): x is NonNullable<typeof x> => !!x);
+        return { weekNum: idx + 1, items };
       })
       .filter((g) => g.items.length > 0);
   }, [marketNewsRows, month]);
@@ -1771,10 +1789,19 @@ function scoreArticle(a: WeeklyNewsRow): number {
 
 function selectTopArticles(articles: WeeklyNewsRow[]): WeeklyNewsRow[] {
   // 1) 포토뉴스·영상뉴스 등 내용 없는 기사, 단순 시황("주가 올랐다" 류) 기사 제외
-  const isLowQuality = (title: string) =>
-    /\[?(포토|사진|현장사진|시험장면|영상)\]?/.test(title) ||
-    /^\[포토\]|\(사진\)|\(현장사진\)|\(영상\)/.test(title) ||
-    /주가.{0,4}(올랐다|상승했다|급등했다)\.?$/.test(title.trim());
+  const isLowQuality = (title: string) => {
+    const t = title.trim();
+    // 1) 사진 중심 기사
+    if (/\[?(포토뉴스|현장포토|포토슬라이드|포토|PHOTO|사진|화보|이함사진|영상)\]?/i.test(t)) return true;
+    if (/^\[포토\]|\(사진\)|\(화보사진\)|\(영상\)/.test(t)) return true;
+    // 2) 단순 시황("주가 올랐다" 류)
+    if (/주가.{0,4}(올랐다|상승했다|급등했다)\.?$/.test(t)) return true;
+    // 3) 단순 인사 기사 (단, M&A·경영권·지분·사업전략 등 중대 이벤트 연계는 제외하지 않음)
+    const isPersonnel = /(임원\s*인사|정기\s*인사|승진|선임|취임|조직개편|신규\s*임원|대표이사\s*인사|인사\s*발령|^인사$|\[인사\])/.test(t);
+    const majorEvent = /(M&A|인수|합병|매각|경영권|지분|최대주주|사업\s*전략|구조조정|상장|분할)/.test(t);
+    if (isPersonnel && !majorEvent) return true;
+    return false;
+  };
   const qualityFiltered = articles.filter((a) => !isLowQuality(a.title));
 
   // 2) URL 동일 제거
@@ -1798,9 +1825,8 @@ function selectTopArticles(articles: WeeklyNewsRow[]): WeeklyNewsRow[] {
   const weekCounts = new Map<string, number>();
   const result: WeeklyNewsRow[] = [];
   for (const a of sorted) {
-    if (result.length >= 4) break;
     const count = weekCounts.get(a.reportDate) ?? 0;
-    if (count >= 2) continue;
+    if (count >= 1) continue;
     weekCounts.set(a.reportDate, count + 1);
     result.push(a);
   }
