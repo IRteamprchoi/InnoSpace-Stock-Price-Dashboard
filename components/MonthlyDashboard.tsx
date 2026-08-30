@@ -740,7 +740,7 @@ const marketWeeklyGroups = useMemo(() => {
                 return g.group === "domestic";
               })
               .map((g) => (
-                <CompanyNewsCard key={g.name} group={g} tableRows={tableRows} />
+                <CompanyNewsCard key={g.name} group={g} tableRows={tableRows} month={month} />
               ))}
           </div>
         </div>
@@ -1844,9 +1844,11 @@ function selectTopArticles(articles: WeeklyNewsRow[], month: string): WeeklyNews
 function CompanyNewsCard({
   group,
   tableRows,
+  month,
 }: {
   group: { name: string; group: Group; articles: WeeklyNewsRow[] };
   tableRows: TableRowData[];
+  month: string;
 }) {
   const row = tableRows.find((r) => r.name === group.name);
   const changePct = row?.snap?.changePct ?? null;
@@ -1886,7 +1888,7 @@ function CompanyNewsCard({
               className="block group"
             >
               <p className="text-[11px] text-slate-500 mb-0.5">
-                {formatDate(a.pubDate)} · {a.source}
+                {(() => { const wk = getKoreanWeekNumber(a.pubDate, month); return wk != null ? `${wk}주차 · ` : ""; })()}{formatDate(a.pubDate)} · {a.source}
               </p>
               <p className="text-[12.5px] text-slate-200 leading-snug line-clamp-2 group-hover:text-amber-300">
                 {a.title}
