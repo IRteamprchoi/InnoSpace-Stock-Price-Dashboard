@@ -1783,18 +1783,7 @@ function normalizeTitle(title: string): string {
     .slice(0, 22);
 }
 
-function scoreArticle(a: WeeklyNewsRow): number {
-  let score = 0;
-  if (HIGH_PRIORITY_KEYWORDS.some((k) => a.title.includes(k))) score += 30;
-  if (MID_PRIORITY_KEYWORDS.some((k) => a.title.includes(k))) score += 15;
-  if (RELIABLE_SOURCES.some((s) => a.source.includes(s))) score += 5;
-  score += Math.min(a.outletCount ?? 0, 5);
-  return score;
-}
-
-function selectTopArticles(articles: WeeklyNewsRow[], month: string): WeeklyNewsRow[] {
-  // 1) 포토뉴스·영상뉴스 등 내용 없는 기사, 단순 시황("주가 올랐다" 류) 기사 제외
-  const isLowQuality = (title: string) => {
+function isLowQuality(title: string): boolean {
     const t = title.trim();
     // 1) 사진 중심 기사
     if (/\[?(포토뉴스|현장포토|포토슬라이드|포토|PHOTO|사진|화보|이함사진|영상)\]?/i.test(t)) return true;
@@ -1806,7 +1795,20 @@ function selectTopArticles(articles: WeeklyNewsRow[], month: string): WeeklyNews
     const majorEvent = /(M&A|인수|합병|매각|경영권|지분|최대주주|사업\s*전략|구조조정|상장|분할)/.test(t);
     if (isPersonnel && !majorEvent) return true;
     return false;
-  };
+  }
+
+function scoreArticle(a: WeeklyNewsRow): number {
+  let score = 0;
+  if (HIGH_PRIORITY_KEYWORDS.some((k) => a.title.includes(k))) score += 30;
+  if (MID_PRIORITY_KEYWORDS.some((k) => a.title.includes(k))) score += 15;
+  if (RELIABLE_SOURCES.some((s) => a.source.includes(s))) score += 5;
+  score += Math.min(a.outletCount ?? 0, 5);
+  return score;
+}
+
+function selectTopArticles(articles: WeeklyNewsRow[], month: string): WeeklyNewsRow[] {
+  // 1) 포토뉴스·영상뉴스 등 내용 없는 기사, 단순 시황("주가 올랐다" 류) 기사 제외
+  
   const qualityFiltered = articles.filter((a) => !isLowQuality(a.title));
 
   // 2) URL 동일 제거
