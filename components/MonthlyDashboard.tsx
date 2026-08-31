@@ -394,31 +394,7 @@ export default function MonthlyDashboard({
     // 주차별 시장 시황: 제목만으로 이해 가능한 기사만 선별하고, 주차당 최대 2건(국내1+미국1)만 남긴다.
   // 주차 계산: 해당 월의 첫 영업일(월~금)이 포함된 일요일~토요일 구간을 1주차로 정의.
 // 순수 캘린더 날짜 문자열 연산만 사용해 Asia/Seoul 기준 날짜가 UTC 변환으로 밀리지 않게 한다.
-function getKoreanWeekNumber(dateStr: string, month: string): number | null {
-  if (!dateStr) return null;
-  // pubDate는 RSS 발행 형식(예: "Fri, 07 Aug 2026 02:35:00 GMT")일 수 있어
-  // Date 파싱 후 KST(UTC+9) 기준 날짜로 해석한다.
-  const parsed = new Date(dateStr);
-  if (isNaN(parsed.getTime())) return null;
-  const kst = new Date(parsed.getTime() + 9 * 60 * 60 * 1000);
-  const [y, m] = month.split("-").map(Number);
-  // 해당 월의 첫 번째 월요일(UTC 기준, 날짜 계산용)
-  let firstMonTime = Date.UTC(y, m - 1, 1);
-  let dow = new Date(firstMonTime).getUTCDay(); // 0=일 … 1=월 … 6=토
-  while (dow !== 1) {
-    firstMonTime += 24 * 60 * 60 * 1000;
-    dow = new Date(firstMonTime).getUTCDay();
-  }
-  // 뉴스 날짜(KST)의 자정 UTC 표현
-  const dUtc = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());
-  // 다른 달의 뉴스는 제외
-  if (kst.getUTCFullYear() !== y || kst.getUTCMonth() !== m - 1) return null;
-  const diffDays = Math.floor((dUtc - firstMonTime) / (24 * 60 * 60 * 1000));
-  // 첫 월요일 이전(예: 8/1 토, 8/2 일)은 주차에 포함하지 않음
-  if (diffDays < 0) return null;
-  const result = Math.floor(diffDays / 7) + 1;
-  return Number.isFinite(result) ? result : null;
-}
+
 const marketWeeklyGroups = useMemo(() => {
     const isGenericTitle = (title: string) =>
       /^\[오늘의증시\]|오늘의\s*증시|^\d[\d.,\s]*$/.test(title.trim());
@@ -1804,6 +1780,32 @@ function scoreArticle(a: WeeklyNewsRow): number {
   if (RELIABLE_SOURCES.some((s) => a.source.includes(s))) score += 5;
   score += Math.min(a.outletCount ?? 0, 5);
   return score;
+}
+
+function getKoreanWeekNumber(dateStr: string, month: string): number | null {
+  if (!dateStr) return null;
+  // pubDate는 RSS 발행 형식(예: "Fri, 07 Aug 2026 02:35:00 GMT")일 수 있어
+  // Date 파싱 후 KST(UTC+9) 기준 날짜로 해석한다.
+  const parsed = new Date(dateStr);
+  if (isNaN(parsed.getTime())) return null;
+  const kst = new Date(parsed.getTime() + 9 * 60 * 60 * 1000);
+  const [y, m] = month.split("-").map(Number);
+  // 해당 월의 첫 번째 월요일(UTC 기준, 날짜 계산용)
+  let firstMonTime = Date.UTC(y, m - 1, 1);
+  let dow = new Date(firstMonTime).getUTCDay(); // 0=일 … 1=월 … 6=토
+  while (dow !== 1) {
+    firstMonTime += 24 * 60 * 60 * 1000;
+    dow = new Date(firstMonTime).getUTCDay();
+  }
+  // 뉴스 날짜(KST)의 자정 UTC 표현
+  const dUtc = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());
+  // 다른 달의 뉴스는 제외
+  if (kst.getUTCFullYear() !== y || kst.getUTCMonth() !== m - 1) return null;
+  const diffDays = Math.floor((dUtc - firstMonTime) / (24 * 60 * 60 * 1000));
+  // 첫 월요일 이전(예: 8/1 토, 8/2 일)은 주차에 포함하지 않음
+  if (diffDays < 0) return null;
+  const result = Math.floor(diffDays / 7) + 1;
+  return Number.isFinite(result) ? result : null;
 }
 
 function selectTopArticles(articles: WeeklyNewsRow[], month: string): WeeklyNewsRow[] {
