@@ -103,7 +103,7 @@ const numOrNull = (v: string | undefined) => {
 // 한글이 깨지는 문제를 원천 차단하기 위함 - 구글시트 게시 CSV는 UTF-8이 맞지만
 // Content-Type에 charset이 안 붙어있으면 자동판별이 틀릴 수 있음)
 async function fetchCsvText(url: string): Promise<string | null> {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, { next: { revalidate: 300 } }); // 5분 캐시: 보고용 페이지 로딩 속도 개선
   if (!res.ok) return null;
   const buf = await res.arrayBuffer();
   return new TextDecoder("utf-8").decode(buf);
