@@ -427,14 +427,14 @@ const marketWeeklyGroups = useMemo(() => {
       (r) => !isGenericTitle(r.title) && !isLowQuality(r.title)
     );
     // pubDate(실제 발행일) 기준 주차(첫 월요일 포함 주=1주차)로 그룹핑
-    const byWeek = new Map<number, MarketNewsRow[]>();
+    const byWeek = new Map<number, MarketNewsMonthlyRow[]>();
     monthRows.forEach((r) => {
       const wk = getKoreanWeekNumber(r.pubDate, month);
       if (wk == null) return;
       byWeek.set(wk, [...(byWeek.get(wk) ?? []), r]);
     });
     // 주차 내 시장별 대표 1건: 링크·제목 중복 제거 → scoreArticle DESC → pubDate DESC
-    const pickBest = (rows: MarketNewsRow[], mkt: string): MarketNewsRow | null => {
+    const pickBest = (rows: MarketNewsMonthlyRow[], mkt: string): MarketNewsMonthlyRow | null => {
       const cand = dedupeByLink(rows.filter((r) => r.market === mkt));
       const seen = new Set<string>();
       const uniq = cand.filter((r) => {
