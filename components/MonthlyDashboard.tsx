@@ -1842,7 +1842,11 @@ function selectTopArticles(articles: WeeklyNewsRow[], month: string): WeeklyNews
     weekCounts.set(wk, count + 1);
     result.push(a);
   }
-  return result;
+  // 주차 오름차순(1->2->3)으로 정렬해 반환
+  return result.sort(
+    (a, b) =>
+      (getKoreanWeekNumber(a.pubDate, month) ?? 0) - (getKoreanWeekNumber(b.pubDate, month) ?? 0)
+  );
 }
 
 function CompanyNewsCard({
@@ -1891,8 +1895,14 @@ function CompanyNewsCard({
               rel="noopener noreferrer"
               className="block group"
             >
+              {(() => {
+                const wk = getKoreanWeekNumber(a.pubDate, month);
+                return wk != null ? (
+                  <p className="text-[10px] font-semibold text-amber-400/80 mb-1">{`${wk}주차`}</p>
+                ) : null;
+              })()}
               <p className="text-[11px] text-slate-500 mb-0.5">
-                {(() => { const wk = getKoreanWeekNumber(a.pubDate, month); return wk != null ? `${wk}주차 · ` : ""; })()}{formatDate(a.pubDate)} · {a.source}
+                {formatDate(a.pubDate)} · {a.source}
               </p>
               <p className="text-[12.5px] text-slate-200 leading-snug line-clamp-2 group-hover:text-amber-300">
                 {a.title}
