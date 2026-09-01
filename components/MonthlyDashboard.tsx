@@ -376,16 +376,23 @@ export default function MonthlyDashboard({
 
   const execSummaryLines = (() => {
     if (excessVsKosdaq == null || !selfRank) return null;
+    const buyers = flowEntries.filter((f) => f.value > 0).map((f) => f.label);
+    const sellers = flowEntries.filter((f) => f.value < 0).map((f) => f.label);
+    const flatOnes = flowEntries.filter((f) => f.value === 0).map((f) => f.label);
+    const flowParts: string[] = [];
+    if (buyers.length > 0) flowParts.push(`${buyers.join("\u00B7")} 투자자는 순매수`);
+    if (sellers.length > 0) flowParts.push(`${sellers.join("\u00B7")} 투자자는 순매도`);
+    if (flatOnes.length > 0) flowParts.push(`${flatOnes.join("\u00B7")} 투자자는 보합`);
     const flowNote =
-      flowEntries.length > 0
-        ? flowEntries
-            .map((f) => `${f.label}${(((f.label.charCodeAt(f.label.length-1)-0xAC00)%28===0)?"는":"은")} ${f.value > 0 ? "순매수" : f.value < 0 ? "순매도" : "보합"}`)
-            .join(", ")
-        : "";
+      flowParts.length === 2 && buyers.length > 0 && sellers.length > 0
+        ? `투자자별 수급은 ${buyers.join("\u00B7")} 투자자가 순매수를 보인 반면, ${sellers.join("\u00B7")} 투자자는 순매도를 기록했습니다.`
+        : flowParts.length > 0
+          ? `투자자별 수급은 ${flowParts.join(", ")}를 기록했습니다.`
+          : "";
     const line1 = `당사는 코스닥 대비 ${excessVsKosdaq >= 0 ? "+" : ""}${excessVsKosdaq.toFixed(
       1
-    )}%p의 초과수익률을 기록했으며, 주가 상승폭 기준 피어그룹 ${rankSorted.length}개사 중 ${selfRank}위, 시가총액 기준 ${selfCapRank}위를 기록했습니다.`;
-    const line2 = flowNote ? `${flowNote}를 보였습니다.` : null;
+    )}%p 상대수익률을 기록했으며, 주가 등락률 기준 피어그룹 ${rankSorted.length}개사 중 ${selfRank}위, 시가총액 기준 ${selfCapRank}위를 기록했습니다.`;
+    const line2 = flowNote ? flowNote : null;
     return { line1, line2 };
   })();
 
