@@ -103,10 +103,23 @@ const numOrNull = (v: string | undefined) => {
 // 한글이 깨지는 문제를 원천 차단하기 위함 - 구글시트 게시 CSV는 UTF-8이 맞지만
 // Content-Type에 charset이 안 붙어있으면 자동판별이 틀릴 수 있음)
 async function fetchCsvText(url: string): Promise<string | null> {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) return null;
-  const buf = await res.arrayBuffer();
-  return new TextDecoder("utf-8").decode(buf);
+  const MAX_TRIES = 3;
+  for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        const text = new TextDecoder("utf-8").decode(buf);
+        if (text && text.trim().length > 0) return text;
+      }
+    } catch (e) {
+      // 네트워크 오류 → 재시도
+    }
+    if (attempt < MAX_TRIES) {
+      await new Promise((r) => setTimeout(r, attempt * 200));
+    }
+  }
+  return null;
 }
 
 export async function getDailyData(): Promise<DailyRow[]> {
