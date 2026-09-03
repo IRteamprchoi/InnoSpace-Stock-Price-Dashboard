@@ -106,14 +106,17 @@ async function fetchCsvText(url: string): Promise<string | null> {
   const MAX_TRIES = 3;
   for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
     try {
-      const res = await fetch(url, { cache: "no-store" });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const buf = await res.arrayBuffer();
         const text = new TextDecoder("utf-8").decode(buf);
         if (text && text.trim().length > 0) return text;
       }
     } catch (e) {
-      // 네트워크 오류 → 재시도
+      // 타임아웃 또는 네트워크 오류 → 재시도
     }
     if (attempt < MAX_TRIES) {
       await new Promise((r) => setTimeout(r, attempt * 200));
