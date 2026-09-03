@@ -106,7 +106,7 @@ async function fetchCsvText(url: string): Promise<string | null> {
   const MAX_TRIES = 3;
   for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
     try {
-      const res = await fetch(url, { cache: "no-store" });
+      const res = await fetch(url, { next: { revalidate: 60 } });
       if (res.ok) {
         const buf = await res.arrayBuffer();
         const text = new TextDecoder("utf-8").decode(buf);
