@@ -14,7 +14,7 @@ export function isLowQuality(title: string): boolean {
   const majorEvent = /(M&A|인수|합병|매각|경영권|지분|최대주주|사업\s*전략|구조조정|상장|분할)/.test(t);
   if (isPersonnel && !majorEvent) return true;
   // 클릭베이트성 질문형 제목 ("~일까요?", "~해줄까요?" 등 - 내용 없는 낚시성 기사)
-  if (/(까요|일까|줄까|될까|갈까|올까)\?\s*$/.test(t)) return true;
+  if (t.includes("?") && /(까요|일까|줄까|될까|갈까|올까)/.test(t)) return true;
   return false;
 }
 
