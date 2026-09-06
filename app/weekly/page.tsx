@@ -4,6 +4,7 @@ import {
   getWeeklyPrices, getWeeklyNews, getIntradayData, getWeeklyIntradayPrice, getWeeklyChartData,
   latestReportOnly, selectReportOnly, listAvailableReports, dedupeBy,
 } from "@/lib/sheets";
+import { isLowQuality, dedupeByLink } from "@/lib/newsFilter";
 
 // 접속할 때마다 최신 주간 데이터를 다시 가져옴
 export const dynamic = "force-dynamic";
@@ -26,7 +27,10 @@ export default async function WeeklyPage({
   // weekly_prices/weekly_news는 매주 계속 누적되므로, 기본은 최신 리포트를 보여주되
   // ?week=2026-07-24 같은 쿼리로 지난 리포트를 선택해서 볼 수 있음 ("지난 리포트 보기")
   const prices = dedupeBy(selectReportOnly(allPrices, selectedWeek), (r) => `${r.category}:${r.code}`);
-  const news = dedupeBy(selectReportOnly(allNews, selectedWeek), (r) => `${r.name}:${r.link}`);
+  const news = dedupeByLink(
+  dedupeBy(selectReportOnly(allNews, selectedWeek), (r) => `${r.name}:${r.link}`)
+    .filter((r) => !isLowQuality(r.title))
+);
   const chartData = dedupeBy(selectReportOnly(allChartData, selectedWeek), (r) => `${r.code}:${r.date}`);
   const availableWeeks = listAvailableReports(allPrices);
 
