@@ -422,7 +422,6 @@ export async function getDomesticDailyData(): Promise<DomesticDailyRow[]> {
 export type WeeklyIntradayRow = {
   tradeDate: string;
   time: string;
-  fullTimestamp: string;
   code: string;
   name: string;
   market: string;
@@ -444,15 +443,17 @@ export async function getWeeklyIntradayPrice(): Promise<WeeklyIntradayRow[]> {
   const rows = parseCsv(text);
   const [, ...dataRows] = rows;
 
-  // 컬럼 순서: 거래일, 측정시각, 전체_timestamp, 종목코드, 기업명, 시장, 현지시간, 한국시간, 주가, 통화, 출처, 수집시각, 간격
+  // 실제 시트 컬럼 순서 (2026-10-01 수정: 존재하지 않는 "전체_timestamp" 컬럼을 끼워 넣어
+  // 인덱스가 하나씩 밀려 있던 버그 수정 - code에 기업명이, price에 통화 문자열이 들어가
+  // 국내 피어 주간 차트가 통째로 비어 보이던 원인이었음):
+  // 거래일, 측정시각, 종목코드, 기업명, 시장, 현지시간, 한국시간, 주가, 통화, 출처, 수집시각, 간격
   return dataRows.map((r) => ({
     tradeDate: r[0],
     time: r[1],
-    fullTimestamp: r[2],
-    code: r[3],
-    name: r[4],
-    market: r[5],
-    price: num(r[8]),
+    code: r[2],
+    name: r[3],
+    market: r[4],
+    price: num(r[7]),
   }));
 }
 
