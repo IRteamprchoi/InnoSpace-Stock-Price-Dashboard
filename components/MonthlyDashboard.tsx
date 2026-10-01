@@ -132,18 +132,27 @@ export default function MonthlyDashboard({
   const isCurrentMonth = month === new Date().toISOString().slice(0, 7);
   const [newsFilter, setNewsFilter] = useState<"전체" | "이노스페이스" | "해외 피어그룹" | "국내 피어그룹">("전체");
 
+  // 2026-10-01: index_daily_history에 같은 날짜가 중복으로 쌓인 사례가 실제로 있었음
+  // (코스피 종목코드 "0001"의 선행 0이 구글시트에서 숫자로 변환되어 백엔드의 중복 방지
+  // 비교("0001" === "1")가 실패, 추석 연휴 3일 내내 9/23 데이터가 새 행으로 계속 append됨).
+  // 날짜별로 1건만 남기는 방어 로직을 추가 - 뒤에 오는(= 더 최근에 수집된) 값을 우선한다.
+  const dedupeByDate = (rows: IndexDailyRow[]): IndexDailyRow[] => {
+    const byDate = new Map<string, IndexDailyRow>();
+    rows.forEach((r) => byDate.set(r.date, r));
+    return Array.from(byDate.values());
+  };
   const kospiRows = useMemo(
     () =>
-      indexRows
-        .filter((r) => r.date.startsWith(month) && r.name.includes("코스피"))
-        .sort((a, b) => a.date.localeCompare(b.date)),
+      dedupeByDate(indexRows.filter((r) => r.date.startsWith(month) && r.name.includes("코스피"))).sort((a, b) =>
+        a.date.localeCompare(b.date)
+      ),
     [indexRows, month]
   );
   const kosdaqRows = useMemo(
     () =>
-      indexRows
-        .filter((r) => r.date.startsWith(month) && r.name.includes("코스닥"))
-        .sort((a, b) => a.date.localeCompare(b.date)),
+      dedupeByDate(indexRows.filter((r) => r.date.startsWith(month) && r.name.includes("코스닥"))).sort((a, b) =>
+        a.date.localeCompare(b.date)
+      ),
     [indexRows, month]
   );
 
