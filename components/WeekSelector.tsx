@@ -3,12 +3,16 @@
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { History } from "lucide-react";
+import { weekdayIndex } from "@/lib/tradingPeriod";
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
 function fmtLabel(reportDate: string, isLatest: boolean) {
-  // reportDate는 "yyyy-MM-dd" (실제 리포트 생성일). 요일도 같이 보여줌
-  const wd = WEEKDAY_KO[new Date(reportDate + "T00:00:00+09:00").getDay()];
+  // reportDate는 "yyyy-MM-dd" (실제 리포트 생성일). 요일도 같이 보여줌.
+  // 2026-10-01: new Date(... + "T00:00:00+09:00").getDay()는 서버(UTC) 환경에서 호출되면
+  // 로컬 타임존(UTC) 기준으로 재해석되어 날짜가 하루 당겨지고 요일이 틀리게 나오는 문제가
+  // 있었음(예: 월요일인 2026-09-28이 "일"로 표시). UTC 전용 계산인 weekdayIndex로 교체.
+  const wd = WEEKDAY_KO[weekdayIndex(reportDate)];
   return `${reportDate}(${wd}) 리포트${isLatest ? " · 최신" : ""}`;
 }
 
