@@ -3,7 +3,7 @@ import type { WeeklyChartPoint } from "@/lib/sheets";
 // 휴장 사유 이름표. 기간 계산에는 쓰이지 않고(기간은 실제 거래 데이터로 계산),
 // "09.24~25 추석 휴장"처럼 이름을 붙일 때만 사용. 목록에 없는 휴장일은 "10.09 휴장"처럼 날짜만 표기됨.
 // 평일 휴장일만 적으면 됨. 매년 연말에 다음 해 목록을 추가해 주세요.
-const KRX_HOLIDAY_NAMES: Record<string, string> = {
+export const KRX_HOLIDAY_NAMES: Record<string, string> = {
   "2026-01-01": "신정",
   "2026-02-16": "설날", "2026-02-17": "설날", "2026-02-18": "설날",
   "2026-03-02": "삼일절 대체공휴일",
