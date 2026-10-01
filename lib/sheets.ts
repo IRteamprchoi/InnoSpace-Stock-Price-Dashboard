@@ -443,18 +443,23 @@ export async function getWeeklyIntradayPrice(): Promise<WeeklyIntradayRow[]> {
   const rows = parseCsv(text);
   const [, ...dataRows] = rows;
 
-  // 실제 시트 컬럼 순서 (2026-10-01 수정: 존재하지 않는 "전체_timestamp" 컬럼을 끼워 넣어
-  // 인덱스가 하나씩 밀려 있던 버그 수정 - code에 기업명이, price에 통화 문자열이 들어가
-  // 국내 피어 주간 차트가 통째로 비어 보이던 원인이었음):
-  // 거래일, 측정시각, 종목코드, 기업명, 시장, 현지시간, 한국시간, 주가, 통화, 출처, 수집시각, 간격
-  return dataRows.map((r) => ({
-    tradeDate: r[0],
-    time: r[1],
-    code: r[2],
-    name: r[3],
-    market: r[4],
-    price: num(r[7]),
-  }));
+  // 2026-10-01: 이 시트는 9/18 전후로 쓰기 포맷이 두 번 바뀌어 두 포맷이 섞여 있음.
+  // 과거(~9/17 무렵) 포맷 - 12컬럼, "전체_timestamp" 없음:
+  //   거래일, 측정시각, 종목코드, 기업명, 시장, 현지시간, 한국시간, 주가, 통화, 출처, 수집시각, 간격
+  // 최근(9/18~) 포맷 - 13컬럼, "전체_timestamp"가 종목코드보다 앞에 추가됨(시장·출처 칸은 빈값):
+  //   거래일, 측정시각, 전체_timestamp, 종목코드, 기업명, (빈값), 현지시간, 한국시간, 주가, 통화, (빈값), 수집시각, 간격
+  // 날짜 경계가 아니라 r[2]가 "YYYY-MM-DD H:MM:SS" 전체 타임스탬프 형태인지로 포맷을 판별해야
+  // 함(실제 전환일이 날짜 구간마다 뒤섞여 있어 날짜로는 못 가름). 둘 다 안 맞추면 국내 피어
+  // 차트가 통째로 비어 보이거나(과거 포맷을 최근 포맷으로 읽을 때), 최근 리포트 주간(가장
+  // 중요한 구간)만 비어 보이는(최근 포맷을 과거 포맷으로 읽을 때) 문제가 생김 - 둘 다 실제로
+  // 겪은 회귀라 이 주석을 남겨둠.
+  const isNewFormat = (r: string[]) => /^\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}:\d{2}$/.test(r[2] ?? "");
+
+  return dataRows.map((r) =>
+    isNewFormat(r)
+      ? { tradeDate: r[0], time: r[1], code: r[3], name: r[4], market: r[5], price: num(r[8]) }
+      : { tradeDate: r[0], time: r[1], code: r[2], name: r[3], market: r[4], price: num(r[7]) }
+  );
 }
 
 // 가장 최근 report_date 하나만 남기기 (weekly_prices/weekly_news는 매주 계속 누적되므로,
