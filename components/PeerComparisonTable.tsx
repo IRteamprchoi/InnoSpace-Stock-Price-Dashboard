@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import { ChevronDown, Info } from "lucide-react";
 import type { WeeklyPriceRow, WeeklyChartPoint } from "@/lib/sheets";
 import type { FxRate } from "@/lib/fx";
+import { type MarketPeriod, closedLabel, mdDot, samePeriod, isWeekendDate, addDaysIso, weekdayIndex } from "@/lib/tradingPeriod";
 
 // 평균 대신 중앙값을 쓰고 싶으면 이 값만 바꾸면 됩니다
 const SUMMARY_STAT: "avg" | "median" = "avg";
@@ -17,21 +18,19 @@ function dotDate(dateStr?: string) {
   return `${y}.${m}.${d}`;
 }
 function addDaysStr(dateStr: string, n: number) {
-  const d = new Date(dateStr + "T00:00:00+09:00");
-  d.setDate(d.getDate() + n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return addDaysIso(dateStr, n);
 }
 function dotDateWeekday(dateStr?: string) {
   if (!dateStr) return "-";
   const [y, m, d] = dateStr.split("-");
-  const wd = WEEKDAY_KO[new Date(dateStr + "T00:00:00+09:00").getDay()];
+  const wd = WEEKDAY_KO[weekdayIndex(dateStr)];
   return `${y}.${m}.${d}(${wd})`;
 }
 // "MM/DD(요일)" - 실제 종가 기준일 표시용 (예: 07/24(금))
 function mmddWeekday(dateStr?: string) {
   if (!dateStr) return "-";
   const [, m, d] = dateStr.split("-");
-  const wd = WEEKDAY_KO[new Date(dateStr + "T00:00:00+09:00").getDay()];
+  const wd = WEEKDAY_KO[weekdayIndex(dateStr)];
   return `${m}/${d}(${wd})`;
 }
 
@@ -133,33 +132,48 @@ export default function PeerComparisonTable({
   rows,
   weekChartData,
   fx,
+  krPeriod = null,
+  usPeriod = null,
 }: {
   rows: WeeklyPriceRow[]; // 이노스페이스 + 국내피어 + 해외피어 (지수 제외), 순서는 아래에서 재정렬
   weekChartData: WeeklyChartPoint[]; // 종목별 그 주 실제 거래일별 시가/고가/저가/종가 (공휴일은 데이터 자체가 없음)
   fx: FxRate | null;
+  krPeriod?: MarketPeriod | null; // 국내 실제 거래기간
+  usPeriod?: MarketPeriod | null; // 미국 실제 거래기간 (현지 날짜)
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
+
+  const refFriday = rows[0]?.refFriday || "";
+  const weekStart = refFriday ? addDaysStr(refFriday, -4) : "";
 
   // 종목코드별로 그 주 실제 거래일만 모아 시작일(월요일 또는 그 주 첫 거래일)/마지막 거래일(금요일
   // 또는 그 주 마지막 거래일) 종가를 뽑아냄 - 공휴일이면 애초에 이 데이터 자체가 없으므로
   // prevClose(지난주 금요일)를 잘못 이번 주 값으로 보여주던 문제가 근본적으로 해결됨
   const weekEdgesByCode = useMemo(() => {
-    const map = new Map<string, { firstDate: string; firstClose: number; lastDate: string; lastClose: number }>();
+    const map = new Map<string, { firstDate: string; firstClose: number; lastDate: string; lastClose: number; high: number; low: number }>();
     const byCode = new Map<string, WeeklyChartPoint[]>();
     weekChartData.forEach((p) => {
       if (!byCode.has(p.code)) byCode.set(p.code, []);
       byCode.get(p.code)!.push(p);
     });
     byCode.forEach((points, code) => {
-      const sorted = [...points].sort((a, b) => (a.date < b.date ? -1 : 1));
+      const all = [...points].sort((a, b) => (a.date < b.date ? -1 : 1));
+      // 리포트 주간 안의 평일만, 그리고 직전 행과 값이 완전히 같은 행(미국 휴장일 복사 행)은 제외
+      const sorted = all.filter((p, i) => {
+        if (weekStart && (p.date < weekStart || p.date > refFriday)) return false;
+        if (isWeekendDate(p.date)) return false;
+        const prev = all[i - 1];
+        return !(prev && prev.open === p.open && prev.high === p.high && prev.low === p.low && prev.close === p.close);
+      });
       if (!sorted.length) return;
       map.set(code, {
         firstDate: sorted[0].date, firstClose: sorted[0].close,
         lastDate: sorted[sorted.length - 1].date, lastClose: sorted[sorted.length - 1].close,
+        high: Math.max(...sorted.map((p) => p.high)), low: Math.min(...sorted.map((p) => p.low)),
       });
     });
     return map;
-  }, [weekChartData]);
+  }, [weekChartData, weekStart, refFriday]);
 
   const innospace = rows.find((r) => r.code === "462350") || null;
   const domesticPeers = rows.filter((r) => r.category === "domestic" && r.code !== "462350");
@@ -169,14 +183,17 @@ export default function PeerComparisonTable({
   // 이노스페이스 -> 해외 피어그룹 -> 국내 피어그룹 순 (발사체 기업 특성상 해외 비교가 더 중요)
   const ordered = innospace ? [innospace, ...usPeers, ...domesticPeers] : [...usPeers, ...domesticPeers];
 
-  const refFriday = rows[0]?.refFriday || "";
-  const weekStart = refFriday ? addDaysStr(refFriday, -4) : "";
+  // 국내와 미국의 실제 거래기간이 다르면(한쪽만 휴장) 열 이름에 날짜 대신 "첫/마지막 거래일"을 쓰고
+  // 각 그룹 구분줄에 시장별 기간을 표기. 같으면 기존처럼 열 이름에 날짜를 표기.
+  const hasUsPeers = rows.some((r) => r.category === "us");
+  const split = hasUsPeers && !samePeriod(krPeriod, usPeriod) && !!krPeriod && !!usPeriod;
   // 헤더 라벨은 이노스페이스(항상 데이터가 있는 당사)의 그 주 실제 거래일 기준으로 표시.
   // 계산으로 구한 "월요일"이 아니라 weekChartData(실제 거래 기록)의 첫/마지막 날짜를 쓰므로,
   // 그 날이 공휴일이었다면 애초에 데이터가 없어서 자동으로 그 다음/이전 실제 거래일로 잡힘.
   const innospaceRow = rows.find((r) => r.code === "462350");
-  const startLabel = mmddWeekday(innospaceRow?.weekOpenDate || weekStart);
-  const endLabel = mmddWeekday(refFriday);
+  const startLabel = split ? "첫 거래일" : mmddWeekday(krPeriod?.first || innospaceRow?.weekOpenDate || weekStart);
+  const endLabel = split ? "마지막 거래일" : mmddWeekday(krPeriod?.last || refFriday);
+  const periodText = (p: MarketPeriod) => `${mdDot(p.first)} ~ ${mdDot(p.last)}`;
 
   const maxAbsRet = useMemo(
     () => Math.max(0.01, ...ordered.map((r) => Math.abs(r.ret1w ?? 0))),
@@ -255,7 +272,17 @@ export default function PeerComparisonTable({
           <h2 className="section-title">이노스페이스 및 피어그룹 주간 주가 동향</h2>
         </div>
         <p className="text-[13px] sm:text-[14px] font-medium" style={{ color: PERIOD_COLOR }}>
-          <span className="font-semibold">기준기간</span> {dotDateWeekday(weekStart)} ~ {dotDateWeekday(refFriday)}
+          {split && krPeriod && usPeriod ? (
+            <>
+              <span className="font-semibold">국내</span> {dotDateWeekday(krPeriod.first)} ~ {dotDateWeekday(krPeriod.last)} ({krPeriod.days}거래일)
+              <span className="mx-2 text-slate-600">·</span>
+              <span className="font-semibold">해외</span> {dotDateWeekday(usPeriod.first)} ~ {dotDateWeekday(usPeriod.last)} 현지 ({usPeriod.days}거래일)
+            </>
+          ) : (
+            <>
+              <span className="font-semibold">기준기간</span> {dotDateWeekday(krPeriod?.first || weekStart)} ~ {dotDateWeekday(krPeriod?.last || refFriday)}
+            </>
+          )}
         </p>
       </div>
 
@@ -361,8 +388,13 @@ export default function PeerComparisonTable({
                 const localCap = fmtLocalCap(r.marketCap, isUs);
                 const edges = weekEdgesByCode.get(r.code);
                 // 우선순위: 1) weekly_prices에 직접 저장된 실제 첫거래일 종가 2) weekly_chart_data 3) prevClose(최후 대체)
-                const weekOpenClose = r.weekOpenClose ?? (edges ? edges.firstClose : r.prevClose);
+                // 미국은 9/28 이전 리포트에 휴장일 복사 행이 섞여 저장돼 있어, 정리된 일봉(edges)을 우선 사용
+                const weekOpenClose = isUs
+                  ? (edges ? edges.firstClose : r.weekOpenClose ?? r.prevClose)
+                  : r.weekOpenClose ?? (edges ? edges.firstClose : r.prevClose);
                 const weekCloseClose = r.close ?? (edges ? edges.lastClose : r.close);
+                const weekHigh = isUs && edges ? edges.high : r.weekHigh;
+                const weekLow = isUs && edges ? edges.low : r.weekLow;
 
                 return (
                   <React.Fragment key={r.code}>
@@ -370,6 +402,9 @@ export default function PeerComparisonTable({
                       <tr>
                         <td colSpan={9} className="px-3 py-1.5 text-[12px] font-semibold text-slate-400 bg-slate-800/40 border-b border-slate-800/60" style={{ height: 32 }}>
                           해외 피어그룹
+                          {split && usPeriod && (
+                            <span className="font-medium text-slate-500"> · {periodText(usPeriod)} 현지 · {usPeriod.days}거래일</span>
+                          )}
                         </td>
                       </tr>
                     )}
@@ -377,6 +412,17 @@ export default function PeerComparisonTable({
                       <tr>
                         <td colSpan={9} className="px-3 py-1.5 text-[12px] font-semibold text-slate-400 bg-slate-800/40 border-b border-slate-800/60" style={{ height: 32 }}>
                           국내 피어그룹
+                          {split && krPeriod && (
+                            <span className="font-medium text-slate-500"> · {periodText(krPeriod)} · {krPeriod.days}거래일</span>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    {isOwn && split && krPeriod && (
+                      <tr>
+                        <td colSpan={9} className="px-3 py-1.5 text-[12px] font-semibold text-slate-400 bg-slate-800/40 border-b border-slate-800/60" style={{ height: 32 }}>
+                          당사
+                          <span className="font-medium text-slate-500"> · {periodText(krPeriod)} · {krPeriod.days}거래일</span>
                         </td>
                       </tr>
                     )}
@@ -404,10 +450,10 @@ export default function PeerComparisonTable({
                         <RetPct v={r.ret1w} size="lg" />
                       </td>
                       <td className="hidden sm:table-cell px-2 py-2 text-right text-slate-400">
-                        <PriceValue n={r.weekHigh} isUs={isUs} />
+                        <PriceValue n={weekHigh} isUs={isUs} />
                       </td>
                       <td className="px-2 py-2 text-right text-slate-400">
-                        <PriceValue n={r.weekLow} isUs={isUs} />
+                        <PriceValue n={weekLow} isUs={isUs} />
                       </td>
                       <td className="px-3 py-2 text-right">
                         <div className="font-bold text-slate-100 tabular-nums text-[13.5px]">{fmtMarketCapKrw(krwMarketCap(r))}</div>
@@ -442,6 +488,15 @@ export default function PeerComparisonTable({
         </div>
       </div>
 
+      {split && krPeriod && usPeriod && (
+        <p className="text-[12px] mt-2 leading-relaxed text-amber-300/80">
+          ※ 이번 주 국내 종목은{" "}
+          {krPeriod.closed.length ? `${krPeriod.closed.map(closedLabel).join(", ")}으로 ` : ""}
+          {krPeriod.days}거래일, 해외 종목은{" "}
+          {usPeriod.closed.length ? `${usPeriod.closed.map(closedLabel).join(", ")}으로 ` : ""}
+          {usPeriod.days}거래일 기준 등락률입니다. 피어그룹 평균·순위는 거래일 수가 다른 수익률을 함께 비교한 값입니다.
+        </p>
+      )}
       <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
         {hasUs && (
           <>

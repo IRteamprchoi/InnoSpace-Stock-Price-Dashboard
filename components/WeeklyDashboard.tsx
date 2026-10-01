@@ -7,13 +7,24 @@ import type { WeeklyPriceRow, WeeklyNewsRow, WeeklyIntradayRow, WeeklyChartPoint
 import type { FxRate } from "@/lib/fx";
 import MiniStockChart from "./MiniStockChart";
 import PeerComparisonTable from "./PeerComparisonTable";
+import { krxPeriod, usPeriod, closedLabel, addDaysIso, weekdayIndex } from "@/lib/tradingPeriod";
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
+// 2026-10-01: weekly_prices는 종목코드를 "012450"처럼 앞자리 0 포함 텍스트로 보관하지만,
+// weekly_intraday_price는 구글시트가 숫자로 자동 변환해 "12450"처럼 0이 빠진 채로 쌓여 있음
+// (해당 시트는 20,000행이 넘어 전부 재정리하기보다 비교 시점에 정규화하는 쪽이 안전함).
+// 숫자로만 된 코드는 선행 0을 제거해 비교하고, 영문 포함 코드(SPCX 등)는 그대로 둠.
+function normalizeStockCode(code: string): string {
+  const trimmed = (code ?? "").trim();
+  if (trimmed === "") return trimmed;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? String(n) : trimmed;
+}
+
 function koreanDateLabel(dateStr: string) {
   if (!dateStr) return "-";
-  const dt = new Date(dateStr + "T00:00:00+09:00");
-  const wd = WEEKDAY_KO[dt.getDay()];
+  const wd = WEEKDAY_KO[weekdayIndex(dateStr)];
   const [y, m, d] = dateStr.split("-");
   return `${y}년 ${parseInt(m)}월 ${parseInt(d)}일 (${wd})`;
 }
@@ -107,9 +118,7 @@ function RetArrow({ v }: { v: number | null }) {
 }
 
 function addDaysStr(dateStr: string, n: number) {
-  const d = new Date(dateStr + "T00:00:00+09:00");
-  d.setDate(d.getDate() + n);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return addDaysIso(dateStr, n);
 }
 
 function ChartGrid({
@@ -140,7 +149,7 @@ function ChartGrid({
         const points = isInnospace
           ? innospaceIntraday.filter((p) => inWeek(p.date))
           : peerIntraday
-              .filter((p) => p.code === r.code && inWeek(p.tradeDate))
+              .filter((p) => normalizeStockCode(p.code) === normalizeStockCode(r.code) && inWeek(p.tradeDate))
               .map((p) => ({ date: p.tradeDate, time: p.time, price: p.price }));
         const companyNews = news.filter((n) => n.name === r.name);
 
@@ -231,21 +240,50 @@ export default function WeeklyDashboard({
   }
 
   const refFriday = prices[0]?.refFriday || "";
-  const weekStartRaw = refFriday ? new Date(refFriday + "T00:00:00+09:00") : null;
-  if (weekStartRaw) weekStartRaw.setDate(weekStartRaw.getDate() - 4);
-  const weekStart = weekStartRaw
-    ? `${weekStartRaw.getFullYear()}-${String(weekStartRaw.getMonth() + 1).padStart(2, "0")}-${String(weekStartRaw.getDate()).padStart(2, "0")}`
-    : "";
+  const weekStart = refFriday ? addDaysIso(refFriday, -4) : "";
   const periodLabel = (d: string) => {
     if (!d) return "-";
     const [y, m, day] = d.split("-");
-    const wd = ["일", "월", "화", "수", "목", "금", "토"][new Date(d + "T00:00:00+09:00").getDay()];
+    const wd = ["일", "월", "화", "수", "목", "금", "토"][weekdayIndex(d)];
     return `${y}.${m}.${day}(${wd})`;
   };
 
+  // 시장별 실제 거래기간 (달력이 아니라 그 주 실제 거래 데이터 기준 → 휴장일이 자동 반영됨)
+  const krPeriod = krxPeriod(
+    weekChartData,
+    prices.filter((r) => r.category === "domestic").map((r) => r.code),
+    weekStart,
+    refFriday
+  );
+  const usPeriodInfo = usPeriod(
+    weekChartData,
+    prices.filter((r) => r.category === "us").map((r) => r.code),
+    weekStart,
+    refFriday
+  );
+  const holidayTag = (label: string) => (
+    <span key={label} className="inline-block whitespace-nowrap text-[11px] font-semibold px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-300">
+      {label}
+    </span>
+  );
+
   return (
     <div>
-      <div className="flex items-center justify-end mb-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <p className="text-[14px] sm:text-[15px] font-semibold text-slate-200">
+            기준주간 {periodLabel(weekStart)} ~ {periodLabel(refFriday)}
+          </p>
+          {(krPeriod || usPeriodInfo) && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] font-medium" style={{ color: "#9FB0C7" }}>
+              {krPeriod && <span>국내 {krPeriod.days}거래일</span>}
+              {krPeriod?.closed.map((g) => holidayTag(closedLabel(g)))}
+              {krPeriod && usPeriodInfo && <span className="text-slate-600">|</span>}
+              {usPeriodInfo && <span>미국 {usPeriodInfo.days}거래일</span>}
+              {usPeriodInfo?.closed.map((g) => holidayTag("미국 " + closedLabel(g)))}
+            </div>
+          )}
+        </div>
         <Suspense fallback={<div style={{ height: 34 }} />}>
           <WeekSelector availableWeeks={availableWeeks} selectedWeek={selectedWeek} />
         </Suspense>
@@ -263,7 +301,10 @@ export default function WeeklyDashboard({
             <h2 className="section-title">시장지수 주간 동향</h2>
           </div>
           <p className="text-[13px] sm:text-[14px] font-medium mb-3" style={{ color: "#9FB0C7" }}>
-            <span className="font-semibold">기준기간</span> {periodLabel(weekStart)} ~ {periodLabel(refFriday)}
+            <span className="font-semibold">기준기간</span>{" "}
+            {krPeriod
+              ? `${periodLabel(krPeriod.first)} ~ ${periodLabel(krPeriod.last)} · ${krPeriod.days}거래일`
+              : `${periodLabel(weekStart)} ~ ${periodLabel(refFriday)}`}
           </p>
           <div className="grid grid-cols-2 gap-3">
             {indices.map((idx) => {
@@ -317,11 +358,11 @@ export default function WeeklyDashboard({
                       }}
                     >
                       <div style={{ gridArea: "date1" }} className="flex items-center gap-2">
-                        <LabelChip>{(idx.weekOpenDate || weekStart).slice(5).replace("-", "/")}</LabelChip>
+                        <LabelChip>{(idx.weekOpenDate || krPeriod?.first || weekStart).slice(5).replace("-", "/")}</LabelChip>
                         <span className="text-[13px] font-bold text-slate-200">{(idx.weekOpenClose ?? idx.prevClose)?.toLocaleString("ko-KR")}</span>
                       </div>
                       <div style={{ gridArea: "date2" }} className="flex items-center gap-2">
-                        <LabelChip>{refFriday.slice(5).replace("-", "/")}</LabelChip>
+                        <LabelChip>{(krPeriod?.last || refFriday).slice(5).replace("-", "/")}</LabelChip>
                         <span className="text-[13px] font-bold text-slate-200">{idx.close?.toLocaleString("ko-KR")}</span>
                       </div>
                       <div style={{ gridArea: "high" }} className="flex items-center gap-2 pl-3 border-l border-slate-800">
@@ -344,7 +385,7 @@ export default function WeeklyDashboard({
       )}
 
       <div className="mb-10">
-        <PeerComparisonTable rows={orderedRows} weekChartData={weekChartData} fx={fx} />
+        <PeerComparisonTable rows={orderedRows} weekChartData={weekChartData} fx={fx} krPeriod={krPeriod} usPeriod={usPeriodInfo} />
       </div>
 
       <div className="flex items-center gap-3 mb-4">
