@@ -11,6 +11,17 @@ import { krxPeriod, usPeriod, closedLabel, addDaysIso, weekdayIndex } from "@/li
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
+// 2026-10-01: weekly_prices는 종목코드를 "012450"처럼 앞자리 0 포함 텍스트로 보관하지만,
+// weekly_intraday_price는 구글시트가 숫자로 자동 변환해 "12450"처럼 0이 빠진 채로 쌓여 있음
+// (해당 시트는 20,000행이 넘어 전부 재정리하기보다 비교 시점에 정규화하는 쪽이 안전함).
+// 숫자로만 된 코드는 선행 0을 제거해 비교하고, 영문 포함 코드(SPCX 등)는 그대로 둠.
+function normalizeStockCode(code: string): string {
+  const trimmed = (code ?? "").trim();
+  if (trimmed === "") return trimmed;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? String(n) : trimmed;
+}
+
 function koreanDateLabel(dateStr: string) {
   if (!dateStr) return "-";
   const wd = WEEKDAY_KO[weekdayIndex(dateStr)];
@@ -138,7 +149,7 @@ function ChartGrid({
         const points = isInnospace
           ? innospaceIntraday.filter((p) => inWeek(p.date))
           : peerIntraday
-              .filter((p) => p.code === r.code && inWeek(p.tradeDate))
+              .filter((p) => normalizeStockCode(p.code) === normalizeStockCode(r.code) && inWeek(p.tradeDate))
               .map((p) => ({ date: p.tradeDate, time: p.time, price: p.price }));
         const companyNews = news.filter((n) => n.name === r.name);
 
