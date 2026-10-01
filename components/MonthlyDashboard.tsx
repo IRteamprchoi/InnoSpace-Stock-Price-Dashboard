@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
+import { isWeekendDate, KRX_HOLIDAY_NAMES } from "@/lib/tradingPeriod";
 import {
   ComposedChart,
   Area,
@@ -152,7 +153,7 @@ export default function MonthlyDashboard({
         const weeklySnap = buildSnapshot(priceRows, c.name, month);
         const isUsCompany = c.group === "us";
         const dailyPoints = weeklySnap
-          ? buildCompanyDailyPoints(chartRows, usHistoryRows, c.name, weeklySnap.code, isUsCompany, month)
+          ? buildCompanyDailyPoints(chartRows, usHistoryRows, domesticDailyRows, c.name, weeklySnap.code, isUsCompany, month)
           : [];
         // 실제 일별 데이터가 있으면 그걸로 월초/월말/최고/최저/등락률을 다시 계산 (더 정확함).
         // 주간 리포트 스냅샷은 marketCap/shares/거래량 등 일별 데이터에 없는 값만 보완적으로 사용.
@@ -663,6 +664,7 @@ const marketWeeklyGroups = useMemo(() => {
           month={month}
           chartRows={chartRows}
           usHistoryRows={usHistoryRows}
+          domesticDailyRows={domesticDailyRows}
         />
         {latestFx && (
           <p className="text-[10px] text-slate-300 font-semibold">
@@ -1133,11 +1135,13 @@ function PeerMonthlyTable({
   month,
   chartRows,
   usHistoryRows,
+  domesticDailyRows,
 }: {
   rows: TableRowData[];
   month: string;
   chartRows: WeeklyChartPoint[];
   usHistoryRows: UsStockHistoryRow[];
+  domesticDailyRows: DomesticDailyRow[];
 }) {
   const [expandedName, setExpandedName] = useState<string | null>(null);
 
@@ -1224,6 +1228,7 @@ function PeerMonthlyTable({
                           month={month}
                           chartRows={chartRows}
                           usHistoryRows={usHistoryRows}
+                          domesticDailyRows={domesticDailyRows}
                         />
                       </td>
                     </tr>
@@ -1296,12 +1301,14 @@ function CompanyDetail({
   month,
   chartRows,
   usHistoryRows,
+  domesticDailyRows,
 }: {
   row: TableRowData;
   isUs: boolean;
   month: string;
   chartRows: WeeklyChartPoint[];
   usHistoryRows: UsStockHistoryRow[];
+  domesticDailyRows: DomesticDailyRow[];
 }) {
   const snap = row.snap;
   const flow = row.flow;
@@ -1310,7 +1317,7 @@ function CompanyDetail({
     return <p className="text-[12px] text-slate-500">이번 달 수집된 데이터가 없습니다.</p>;
   }
 
-  const dailyPoints = buildCompanyDailyPoints(chartRows, usHistoryRows, row.name, snap.code, isUs, month);
+  const dailyPoints = buildCompanyDailyPoints(chartRows, usHistoryRows, domesticDailyRows, row.name, snap.code, isUs, month);
   const marketCapPctChange =
     snap.openMarketCap != null && snap.openMarketCap !== 0 && snap.marketCapChange != null
       ? (snap.marketCapChange / snap.openMarketCap) * 100
@@ -1471,6 +1478,7 @@ const US_SYMBOL_MAP: Record<string, string> = {
 function buildCompanyDailyPoints(
   chartRows: WeeklyChartPoint[],
   usHistoryRows: UsStockHistoryRow[],
+  domesticDailyRows: DomesticDailyRow[],
   name: string,
   code: string,
   isUs: boolean,
@@ -1487,10 +1495,26 @@ function buildCompanyDailyPoints(
       .map(([date, value]) => ({ date, value }));
   }
   // 동일 날짜가 여러 report_date에 중복 저장될 수 있어(재실행 등), 날짜별로 1건만 사용
-  const byDate = new Map<string, { close: number; high: number; low: number }>();
+  const byDate = new Map<string, { close: number; high?: number; low?: number }>();
   chartRows
     .filter((r) => String(r.code).replace(/^0+/, "") === String(code).replace(/^0+/, "") && r.date.startsWith(month))
     .forEach((r) => byDate.set(r.date, { close: r.close, high: r.high, low: r.low }));
+  // 2026-10-01: weekly_chart_data는 "다음 주간 리포트가 생성될 때"(보통 그 다음 주 월요일)에야
+  // 그 주 날짜가 채워져, 월말 며칠은 다음 리포트가 돌기 전까지 항상 비어 보이는 구조적 문제가
+  // 있었음(예: 10/6에 생성될 리포트가 돌기 전까지 9/28~30 가격이 월간 대시보드에 안 잡힘).
+  // domestic_daily_data는 KIS에서 매일 수집되므로, 아직 weekly_chart_data에 없는 최신 날짜를
+  // 여기서 보완한다(high/low는 이 시트에 없어 종가만 채움). 다만 이 시트는 주말·공휴일에도
+  // 직전 거래일 값을 그대로 복사해 채워 넣고 있어(실측: 9/24~27이 전부 9/24 종가로 동일),
+  // 주말을 거르고 "직전 레코드와 값이 완전히 같은 평일"도 휴장일 복사로 간주해 제외한다.
+  const domesticSorted = domesticDailyRows
+    .filter((r) => r.code.replace(/^0+/, "") === String(code).replace(/^0+/, "") && r.date.startsWith(month))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  domesticSorted.forEach((r, i) => {
+    if (byDate.has(r.date) || isWeekendDate(r.date) || KRX_HOLIDAY_NAMES[r.date]) return;
+    const prev = domesticSorted[i - 1];
+    if (prev && prev.close === r.close) return;
+    byDate.set(r.date, { close: r.close });
+  });
   return Array.from(byDate.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, v]) => ({ date, value: v.close, high: v.high, low: v.low }));
