@@ -486,17 +486,35 @@ const marketWeeklyGroups = useMemo(() => {
   }, [usHistoryRows, month]);
 
   // 국내/미국 각 시장의 월초·월말 실제 거래일 (데이터 날짜 기준, 시장별 독립 계산)
-  const domesticDates = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          chartRows
-            .filter((r) => /^\d/.test(String(r.code)) && r.date && r.date.startsWith(month))
-            .map((r) => r.date)
-        )
-      ).sort(),
-    [chartRows, month]
-  );
+  const domesticDates = useMemo(() => {
+    // weekly_chart_data의 거래일은 그대로 신뢰
+    const validDates = new Set<string>(
+      chartRows
+        .filter((r) => /^\d/.test(String(r.code)) && r.date && r.date.startsWith(month))
+        .map((r) => r.date)
+    );
+    // 2026-10-01: 위 chartRows만으로는 다음 주간 리포트가 생성되기 전까지 월말 며칠이 항상
+    // 빠져 보이는 문제가 있어(buildCompanyDailyPoints와 동일한 원인), domestic_daily_data로
+    // 아직 chartRows에 없는 날짜를 보완한다. 이 시트는 주말·공휴일에도 직전 거래일 값을 그대로
+    // 복사해 채워 넣으므로, 종목별로 주말·공휴일과 "직전 레코드와 값이 완전히 같은 평일"을 제외.
+    const byCode = new Map<string, { date: string; close: number }[]>();
+    domesticDailyRows
+      .filter((r) => r.date && r.date.startsWith(month))
+      .forEach((r) => {
+        if (!byCode.has(r.code)) byCode.set(r.code, []);
+        byCode.get(r.code)!.push({ date: r.date, close: r.close });
+      });
+    byCode.forEach((rows) => {
+      const sorted = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+      sorted.forEach((r, i) => {
+        if (validDates.has(r.date) || isWeekendDate(r.date) || KRX_HOLIDAY_NAMES[r.date]) return;
+        const prev = sorted[i - 1];
+        if (prev && prev.close === r.close) return;
+        validDates.add(r.date);
+      });
+    });
+    return Array.from(validDates).sort();
+  }, [chartRows, domesticDailyRows, month]);
   const usDates = useMemo(
     () => usHistoryRows.map((r) => r.date).filter((d) => d.startsWith(month)).sort(),
     [usHistoryRows, month]
